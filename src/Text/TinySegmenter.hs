@@ -4,7 +4,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
-module Text.TinySegmenter() where
+module Text.TinySegmenter where
 
 import           Control.Monad.Trans.State
 import           Data.Text                     as T
@@ -54,6 +54,26 @@ getCTypes c
   h    = $([| S.fromList "々〆ヵヶ" |])
   ksub = $([| S.fromList "ーｰ\xff9e" |])
 {-# INLINABLE getCTypes #-}
+
+data TokenizeState = TS { remain :: !T.Text
+                        , score :: !Int#
+                        , p1 :: !Int#
+                        , p2 :: !Int#
+                        , p3 :: !Int#
+                        , w1 :: !(# Char | () #)
+                        , w2 :: !(# Char | () #)
+                        , w3 :: !(# Char | () #)
+                        , w4 :: !(# Char | () #)
+                        , w5 :: !(# Char | () #)
+                        , w6 :: !(# Char | () #)
+                        , c1 :: !Int#
+                        , c2 :: !Int#
+                        , c3 :: !Int#
+                        , c4 :: !Int#
+                        , c5 :: !Int#
+                        , c6 :: !Int#
+                        }
+
 
 takeThree :: T.Text -> (# (# Char, Char, Char #) | (# Char, Char #) | Char | () #)
 takeThree text
