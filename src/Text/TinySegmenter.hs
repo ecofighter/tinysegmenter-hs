@@ -8,7 +8,7 @@
 module Text.TinySegmenter where
 
 import           Control.Monad.Trans.State
-import           Control.Monad.Trans.Identity
+import           Data.Functor.Identity
 import           Data.Sequence
 import qualified Data.HashMap.Strict           as M
 import qualified Data.HashSet                  as S
@@ -101,23 +101,32 @@ takeThree text
     c = T.head . T.tail $ T.tail text
 {-# INLINE takeThree #-}
 
-mapCType3 :: (# Char, Char, Char #) -> (# Int#, Int#, Int# #)
-mapCType3 (# a, b, c #) = (# getCTypes a, getCTypes b, getCTypes c #)
-{-# INLINE mapCType3 #-}
-
-mapCType2 :: (# Char, Char #) -> (# Int#, Int# #)
-mapCType2 (# a, b #) = (# getCTypes a, getCTypes b #)
-{-# INLINE mapCType2 #-}
+mapCType :: (# Char | () #) -> Int#
+mapCType (# a | #) = getCTypes a
+mapCType (# | () #) = mk2i O
+{-# INLINE mapCType #-}
 
 makeInitialState :: T.Text -> TokenizeState
-makeInitialState text = do
+makeInitialState text = runIdentity $ do
   let (# a, b, c, rmn #) = takeThree text
-  TS { remain = rmn
-     , score = bias
-     , p1 = mk2i U
-     , p2 = mk2i U
-     , p3 = mk2i U
-     }
+  return TS { remain = rmn
+            , score = bias
+            , p1 = mk2i U
+            , p2 = mk2i U
+            , p3 = mk2i U
+            , w1 = (# | () #)
+            , w2 = (# | () #)
+            , w3 = (# | () #)
+            , w4 = a
+            , w5 = b
+            , w6 = c
+            , c1 = mk2i O
+            , c2 = mk2i O
+            , c3 = mk2i O
+            , c4 = mapCType a
+            , c5 = mapCType b
+            , c6 = mapCType c
+            }
   where
     bias = -332#
 {-# INLINE makeInitialState #-}
