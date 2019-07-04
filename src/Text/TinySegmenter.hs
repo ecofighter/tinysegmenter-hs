@@ -8,11 +8,11 @@
 module Text.TinySegmenter where
 
 import           Control.Monad.Trans.State
-import           Data.Sequence                 (Seq)
-import qualified Data.Sequence                 as Seq
 import qualified Data.HashMap.Strict           as M
 import qualified Data.HashSet                  as S
 import           Data.Text                     as T
+import           Data.Text.Lazy                as LT
+import           Data.Text.Lazy.Builder        as LT
 import           GHC.Prim
 
 data Marker = U | O | B
@@ -75,7 +75,7 @@ mapCType !(# | () #) = mk2i O
 {-# INLINE mapCType #-}
 
 data TokenizeState = TS { remain :: !T.Text
-                        , seg :: Seq Char
+                        , word :: LT.Builder
                         , score :: !Int#
                         , p1 :: !Int#
                         , p2 :: !Int#
