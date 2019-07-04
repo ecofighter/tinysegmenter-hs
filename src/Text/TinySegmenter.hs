@@ -2,13 +2,17 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Text.TinySegmenter where
 
 import           Control.Monad.Trans.State
-import           Data.Text                     as T
+import           Control.Monad.Trans.Identity
+import           Data.Sequence
+import qualified Data.HashMap.Strict           as M
 import qualified Data.HashSet                  as S
+import           Data.Text                     as T
 import           GHC.Prim
 
 data Marker = U | O | B
@@ -74,17 +78,22 @@ data TokenizeState = TS { remain :: !T.Text
                         , c6 :: !Int#
                         }
 
+nTimes :: Int -> (a -> a) -> a -> a
+nTimes 0 _ = id
+nTimes 1 f = f
+nTimes n f = f . nTimes (n-1) f
+{-# INLINE nTimes #-}
 
-takeThree :: T.Text -> (# (# Char, Char, Char #) | (# Char, Char #) | Char | () #)
+takeThree :: T.Text -> (# (# Char | () #), (# Char | () #), (# Char | () #), T.Text #)
 takeThree text
   | l >= 3
-  = (# (# a, b, c #) | | | #)
+  = (# (# a | #), (# b | #), (# c | #), nTimes 3 T.tail text #)
   | l == 2
-  = (# | (# a, b #) | | #)
+  = (# (# a | #), (# b | #), (# | () #), nTimes 2 T.tail text #)
   | l == 1
-  = (# | | a | #)
+  = (# (# a | #), (# | () #), (# | () #), nTimes 1 T.tail text #)
   | otherwise
-  = (# | | | () #)
+  = (# (# | () #), (# | () #), (# | () #), nTimes 0 T.tail text #)
   where
     !l = T.length text
     a = T.head text
@@ -99,3 +108,16 @@ mapCType3 (# a, b, c #) = (# getCTypes a, getCTypes b, getCTypes c #)
 mapCType2 :: (# Char, Char #) -> (# Int#, Int# #)
 mapCType2 (# a, b #) = (# getCTypes a, getCTypes b #)
 {-# INLINE mapCType2 #-}
+
+makeInitialState :: T.Text -> TokenizeState
+makeInitialState text = do
+  let (# a, b, c, rmn #) = takeThree text
+  TS { remain = rmn
+     , score = bias
+     , p1 = mk2i U
+     , p2 = mk2i U
+     , p3 = mk2i U
+     }
+  where
+    bias = -332#
+{-# INLINE makeInitialState #-}
