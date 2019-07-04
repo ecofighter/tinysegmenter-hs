@@ -59,6 +59,21 @@ getCTypes c
   ksub = $([| S.fromList "ーｰ\xff9e" |])
 {-# INLINABLE getCTypes #-}
 
+takeThree :: T.Text -> (# (# Char | () #), (# Char | () #), (# Char | () #), T.Text #)
+takeThree !text = case T.uncons text of
+  Nothing -> (# (# | () #), (# | () #), (# | () #), text #)
+  Just (ca, ra) -> case T.uncons ra of
+    Nothing -> (# (# ca | #), (# | () #), (# | () #), ra #)
+    Just (cb, rb) -> case T.uncons rb of
+      Nothing -> (# (# ca | #), (# cb | #), (# | () #), rb #)
+      Just (cc, rc) ->(# (# ca | #), (# cb | #), (# cc | #), rc #)
+{-# INLINE takeThree #-}
+
+mapCType :: (# Char | () #) -> Int#
+mapCType !(# a | #) = getCTypes a
+mapCType !(# | () #) = mk2i O
+{-# INLINE mapCType #-}
+
 data TokenizeState = TS { remain :: !T.Text
                         , seg :: Seq Char
                         , score :: !Int#
@@ -79,30 +94,9 @@ data TokenizeState = TS { remain :: !T.Text
                         , c6 :: !Int#
                         }
 
-nTimes :: Int -> (a -> a) -> a -> a
-nTimes 0 _ = id
-nTimes 1 f = f
-nTimes n f = f . nTimes (n-1) f
-{-# INLINE nTimes #-}
-
-takeThree :: T.Text -> (# (# Char | () #), (# Char | () #), (# Char | () #), T.Text #)
-takeThree text = case T.uncons text of
-  Nothing -> (# (# | () #), (# | () #), (# | () #), text #)
-  Just (ca, ra) -> case T.uncons ra of
-    Nothing -> (# (# ca | #), (# | () #), (# | () #), ra #)
-    Just (cb, rb) -> case T.uncons rb of
-      Nothing -> (# (# ca | #), (# cb | #), (# | () #), rb #)
-      Just (cc, rc) ->(# (# ca | #), (# cb | #), (# cc | #), rc #)
-{-# INLINE takeThree #-}
-
-mapCType :: (# Char | () #) -> Int#
-mapCType (# a | #) = getCTypes a
-mapCType (# | () #) = mk2i O
-{-# INLINE mapCType #-}
-
 makeInitialState :: T.Text -> TokenizeState
-makeInitialState text =
-  let (# a, b, c, rmn #) = takeThree text in
+makeInitialState !text =
+  let !(# a, b, c, rmn #) = takeThree text in
   TS { remain = rmn
      , score = bias
      , p1 = mk2i U
