@@ -12,28 +12,28 @@ import qualified Data.HashMap.Strict           as M
 import qualified Data.HashSet                  as S
 import qualified Data.Text                     as T
 import qualified Data.Text.Array               as TA
-import           GHC.Prim
+import           GHC.Exts
 
 data Marker = U | O | B
 data CTypes = TM | TH | TI | TK | TA | TN | TO
 
 mk2i m = case m of
-  U -> 85#
-  O -> 79#
-  B -> 66#
+  U -> fromEnum 'U'
+  O -> fromEnum 'O'
+  B -> fromEnum 'B'
 {-# INLINE mk2i #-}
 
 ct2i c = case c of
-  TM -> 77#
-  TH -> 72#
-  TI -> 73#
-  TK -> 75#
-  TA -> 65#
-  TN -> 78#
-  TO -> 79#
+  TM -> fromEnum 'M'
+  TH -> fromEnum 'H'
+  TI -> fromEnum 'I'
+  TK -> fromEnum 'K'
+  TA -> fromEnum 'A'
+  TN -> fromEnum 'N'
+  TO -> fromEnum 'O'
 {-# INLINE ct2i #-}
 
-getCTypes :: Char -> Int#
+getCTypes :: Char -> Int
 getCTypes c
   | S.member c m
   = ct2i TM
@@ -52,10 +52,10 @@ getCTypes c
   = ct2i TN
   | otherwise
   = ct2i TO
- where
-  m    = $([| S.fromList "一二三四五六七八九十百千万億兆" |])
-  h    = $([| S.fromList "々〆ヵヶ" |])
-  ksub = $([| S.fromList "ーｰ\xff9e" |])
+  where
+    m    = $([| S.fromList "一二三四五六七八九十百千万億兆" |])
+    h    = $([| S.fromList "々〆ヵヶ" |])
+    ksub = $([| S.fromList "ーｰ\xff9e" |])
 {-# INLINABLE getCTypes #-}
 
 takeThree :: T.Text -> (# (# Char | () #), (# Char | () #), (# Char | () #), T.Text #)
@@ -68,33 +68,33 @@ takeThree text = case T.uncons text of
       Just (cc, rc) ->(# (# ca | #), (# cb | #), (# cc | #), rc #)
 {-# INLINE takeThree #-}
 
-mapCType :: (# Char | () #) -> Int#
+mapCType :: (# Char | () #) -> Int
 mapCType (# a | #) = getCTypes a
 mapCType (# | () #) = mk2i O
 {-# INLINE mapCType #-}
 
 data TokenizeState = TS { remain :: !T.Text
                         -- , word :: LT.Builder
-                        , score :: !Int#
-                        , p1 :: !Int#
-                        , p2 :: !Int#
-                        , p3 :: !Int#
+                        , score :: {-# UNPACK #-} !Int
+                        , p1 :: {-# UNPACK #-} !Int
+                        , p2 :: {-# UNPACK #-} !Int
+                        , p3 :: {-# UNPACK #-} !Int
                         , w1 :: !(# Char | () #)
                         , w2 :: !(# Char | () #)
                         , w3 :: !(# Char | () #)
                         , w4 :: !(# Char | () #)
                         , w5 :: !(# Char | () #)
                         , w6 :: !(# Char | () #)
-                        , c1 :: !Int#
-                        , c2 :: !Int#
-                        , c3 :: !Int#
-                        , c4 :: !Int#
-                        , c5 :: !Int#
-                        , c6 :: !Int#
+                        , c1 :: {-# UNPACK #-} !Int
+                        , c2 :: {-# UNPACK #-} !Int
+                        , c3 :: {-# UNPACK #-} !Int
+                        , c4 :: {-# UNPACK #-} !Int
+                        , c5 :: {-# UNPACK #-} !Int
+                        , c6 :: {-# UNPACK #-} !Int
                         }
 
 makeInitialState :: T.Text -> TokenizeState
-makeInitialState !text =
+makeInitialState text =
   let !(# a, b, c, rmn #) = takeThree text in
   TS { remain = rmn
      , score = bias
@@ -115,5 +115,5 @@ makeInitialState !text =
      , c6 = mapCType c
      }
   where
-    bias = -332#
+    bias = -332
 {-# INLINE makeInitialState #-}
