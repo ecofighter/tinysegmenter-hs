@@ -8,8 +8,8 @@
 module Text.TinySegmenter where
 
 import           Control.Monad.Trans.State
-import           Data.Functor.Identity
-import           Data.Sequence
+import           Data.Sequence                 (Seq)
+import qualified Data.Sequence                 as Seq
 import qualified Data.HashMap.Strict           as M
 import qualified Data.HashSet                  as S
 import           Data.Text                     as T
@@ -60,6 +60,7 @@ getCTypes c
 {-# INLINABLE getCTypes #-}
 
 data TokenizeState = TS { remain :: !T.Text
+                        , seg :: Seq Char
                         , score :: !Int#
                         , p1 :: !Int#
                         , p2 :: !Int#
@@ -85,20 +86,13 @@ nTimes n f = f . nTimes (n-1) f
 {-# INLINE nTimes #-}
 
 takeThree :: T.Text -> (# (# Char | () #), (# Char | () #), (# Char | () #), T.Text #)
-takeThree text
-  | l >= 3
-  = (# (# a | #), (# b | #), (# c | #), nTimes 3 T.tail text #)
-  | l == 2
-  = (# (# a | #), (# b | #), (# | () #), nTimes 2 T.tail text #)
-  | l == 1
-  = (# (# a | #), (# | () #), (# | () #), nTimes 1 T.tail text #)
-  | otherwise
-  = (# (# | () #), (# | () #), (# | () #), nTimes 0 T.tail text #)
-  where
-    !l = T.length text
-    a = T.head text
-    b = T.head $ T.tail text
-    c = T.head . T.tail $ T.tail text
+takeThree text = case T.uncons text of
+  Nothing -> (# (# | () #), (# | () #), (# | () #), text #)
+  Just (ca, ra) -> case T.uncons ra of
+    Nothing -> (# (# ca | #), (# | () #), (# | () #), ra #)
+    Just (cb, rb) -> case T.uncons rb of
+      Nothing -> (# (# ca | #), (# cb | #), (# | () #), rb #)
+      Just (cc, rc) ->(# (# ca | #), (# cb | #), (# cc | #), rc #)
 {-# INLINE takeThree #-}
 
 mapCType :: (# Char | () #) -> Int#
@@ -107,26 +101,26 @@ mapCType (# | () #) = mk2i O
 {-# INLINE mapCType #-}
 
 makeInitialState :: T.Text -> TokenizeState
-makeInitialState text = runIdentity $ do
-  let (# a, b, c, rmn #) = takeThree text
-  return TS { remain = rmn
-            , score = bias
-            , p1 = mk2i U
-            , p2 = mk2i U
-            , p3 = mk2i U
-            , w1 = (# | () #)
-            , w2 = (# | () #)
-            , w3 = (# | () #)
-            , w4 = a
-            , w5 = b
-            , w6 = c
-            , c1 = mk2i O
-            , c2 = mk2i O
-            , c3 = mk2i O
-            , c4 = mapCType a
-            , c5 = mapCType b
-            , c6 = mapCType c
-            }
+makeInitialState text =
+  let (# a, b, c, rmn #) = takeThree text in
+  TS { remain = rmn
+     , score = bias
+     , p1 = mk2i U
+     , p2 = mk2i U
+     , p3 = mk2i U
+     , w1 = (# | () #)
+     , w2 = (# | () #)
+     , w3 = (# | () #)
+     , w4 = a
+     , w5 = b
+     , w6 = c
+     , c1 = mk2i O
+     , c2 = mk2i O
+     , c3 = mk2i O
+     , c4 = mapCType a
+     , c5 = mapCType b
+     , c6 = mapCType c
+     }
   where
     bias = -332#
 {-# INLINE makeInitialState #-}
