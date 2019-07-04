@@ -10,9 +10,8 @@ module Text.TinySegmenter where
 import           Control.Monad.Trans.State
 import qualified Data.HashMap.Strict           as M
 import qualified Data.HashSet                  as S
-import           Data.Text                     as T
-import           Data.Text.Lazy                as LT
-import           Data.Text.Lazy.Builder        as LT
+import qualified Data.Text                     as T
+import qualified Data.Text.Array               as TA
 import           GHC.Prim
 
 data Marker = U | O | B
@@ -60,7 +59,7 @@ getCTypes c
 {-# INLINABLE getCTypes #-}
 
 takeThree :: T.Text -> (# (# Char | () #), (# Char | () #), (# Char | () #), T.Text #)
-takeThree !text = case T.uncons text of
+takeThree text = case T.uncons text of
   Nothing -> (# (# | () #), (# | () #), (# | () #), text #)
   Just (ca, ra) -> case T.uncons ra of
     Nothing -> (# (# ca | #), (# | () #), (# | () #), ra #)
@@ -70,12 +69,12 @@ takeThree !text = case T.uncons text of
 {-# INLINE takeThree #-}
 
 mapCType :: (# Char | () #) -> Int#
-mapCType !(# a | #) = getCTypes a
-mapCType !(# | () #) = mk2i O
+mapCType (# a | #) = getCTypes a
+mapCType (# | () #) = mk2i O
 {-# INLINE mapCType #-}
 
 data TokenizeState = TS { remain :: !T.Text
-                        , word :: LT.Builder
+                        -- , word :: LT.Builder
                         , score :: !Int#
                         , p1 :: !Int#
                         , p2 :: !Int#
