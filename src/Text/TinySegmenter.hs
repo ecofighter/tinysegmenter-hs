@@ -1,9 +1,13 @@
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE BangPatterns #-}
-module Text.TinySegmenter where
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
+module Text.TinySegmenter() where
 
-import           Control.DeepSeq
 import           Control.Monad.Trans.State
+import           Data.Text                     as T
 import qualified Data.HashSet                  as S
 import           GHC.Prim
 
@@ -26,29 +30,52 @@ ct2i c = case c of
   TO -> 79#
 {-# INLINE ct2i #-}
 
-
 getCTypes :: Char -> Int#
 getCTypes c
   | S.member c m
   = ct2i TM
-  | '一' <= c && c <= '龠'
-    || S.member c h
+  | ('一' <= c && c <= '龠') || S.member c h
   = ct2i TH
   | 'ぁ' <= c && c <= 'ん'
   = ct2i TI
-  | 'ァ' <= c && c <= 'ヴ'
-    || 'ｱ' <= c && c <= 'ﾝ'
-    || S.member c ksub
+  | ('ァ' <= c && c <= 'ヴ') || ('ｱ' <= c && c <= 'ﾝ') || S.member c ksub
   = ct2i TK
-  | 'a' <= c && c <= 'z'
-    || 'A' <= c && c <= 'Z'
-    || 'ａ' <= c && c <= 'ｚ'
-    || 'Ａ' <= c && c <= 'Ｚ'
+  | ('a' <= c && c <= 'z')
+    || ('A' <= c && c <= 'Z')
+    || ('ａ' <= c && c <= 'ｚ')
+    || ('Ａ' <= c && c <= 'Ｚ')
   = ct2i TA
-  | '0' <= c && c <= '9'
-    || '０' <= c && c <= '９'
+  | ('0' <= c && c <= '9') || ('０' <= c && c <= '９')
   = ct2i TN
+  | otherwise
+  = ct2i TO
  where
-  !m    = let m = S.fromList "一二三四五六七八九十百千万億兆" in deepseq m m
-  !h    = let h = S.fromList "々〆ヵヶ" in deepseq h h
-  !ksub = let ksub = S.fromList "ーｰ\xff9e" in deepseq ksub ksub
+  m    = $([| S.fromList "一二三四五六七八九十百千万億兆" |])
+  h    = $([| S.fromList "々〆ヵヶ" |])
+  ksub = $([| S.fromList "ーｰ\xff9e" |])
+{-# INLINABLE getCTypes #-}
+
+takeThree :: T.Text -> (# (# Char, Char, Char #) | (# Char, Char #) | Char | () #)
+takeThree text
+  | l >= 3
+  = (# (# a, b, c #) | | | #)
+  | l == 2
+  = (# | (# a, b #) | | #)
+  | l == 1
+  = (# | | a | #)
+  | otherwise
+  = (# | | | () #)
+  where
+    !l = T.length text
+    a = T.head text
+    b = T.head $ T.tail text
+    c = T.head . T.tail $ T.tail text
+{-# INLINE takeThree #-}
+
+mapCType3 :: (# Char, Char, Char #) -> (# Int#, Int#, Int# #)
+mapCType3 (# a, b, c #) = (# getCTypes a, getCTypes b, getCTypes c #)
+{-# INLINE mapCType3 #-}
+
+mapCType2 :: (# Char, Char #) -> (# Int#, Int# #)
+mapCType2 (# a, b #) = (# getCTypes a, getCTypes b #)
+{-# INLINE mapCType2 #-}
