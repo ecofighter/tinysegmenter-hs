@@ -3,15 +3,18 @@
 {-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Text.TinySegmenter where
 
+import           Control.Monad.ST
 import           Control.Monad.Trans.State
 import           Data.Char
 import qualified Data.HashSet                  as S
 import qualified Data.Text                     as T
-import qualified Data.Text.Array               as TA
+import qualified Data.Text.Array               as A
+import qualified Data.Text.Internal            as TI
 import           Data.Word
 import           GHC.Exts
 
@@ -85,8 +88,25 @@ takeOne :: T.Text -> Maybe (Int, T.Text)
 takeOne = fmap (\(c, r) -> (ord c, r)) . T.uncons
 {-# INLINE takeOne #-}
 
+type Offset = Int
+type CharWriter = forall s. A.MArray s -> Offset -> ST s ()
+type ArrayLength = Int
+data WordBuilder = WB {-# UNPACK #-} !CharWriter !ArrayLength
+
+emptyWB :: WordBuilder
+emptyWB = WB (\_ _ -> return ()) 0
+
+runWB :: WordBuilder -> T.Text
+runWB (WB writer length) = TI.text arr 0 length
+  where
+    arr = runST $ do
+      arr' <- A.new length
+      writer arr' 0
+      A.unsafeFreeze arr'
+{-# INLINABLE runWB #-}
+
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
-                        -- , word :: LT.Builder
+                        , wordBuilder :: {-# UNPACK #-} !WordBuilder
                         , score :: {-# UNPACK #-} !Int
                         , p1 :: {-# UNPACK #-} !Word8
                         , p2 :: {-# UNPACK #-} !Word8
@@ -109,6 +129,7 @@ makeInitialState :: T.Text -> TokenizeState
 makeInitialState text =
   let !(# a, b, c, rmn #) = takeThree text in
   TS { remain = rmn
+     , wordBuilder = emptyWB
      , score = bias
      , p1 = mk2i U
      , p2 = mk2i U
@@ -128,4 +149,4 @@ makeInitialState text =
      }
   where
     bias = -332
-{-# INLINE makeInitialState #-}
+{-# INLINABLE makeInitialState #-}
