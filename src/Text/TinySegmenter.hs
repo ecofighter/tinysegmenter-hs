@@ -27,20 +27,20 @@ data CTypes = TM | TH | TI | TK | TA | TN | TO
 
 mk2i :: Marker -> Word8
 mk2i m = case m of
-  U -> $( let x = fromIntegral $ ord 'U' :: Word8 in [| x |] )
-  O -> $( let x = fromIntegral $ ord 'O' :: Word8 in [| x |] )
-  B -> $( let x = fromIntegral $ ord 'B' :: Word8 in [| x |] )
+  U -> fromIntegral $ ord 'U'
+  O -> fromIntegral $ ord 'O'
+  B -> fromIntegral $ ord 'B'
 {-# INLINE mk2i #-}
 
 ct2i :: CTypes -> Word8
 ct2i c = case c of
-  TM -> $( let x = fromIntegral $ ord 'M' :: Word8 in [| x |] )
-  TH -> $( let x = fromIntegral $ ord 'H' :: Word8 in [| x |] )
-  TI -> $( let x = fromIntegral $ ord 'I' :: Word8 in [| x |] )
-  TK -> $( let x = fromIntegral $ ord 'K' :: Word8 in [| x |] )
-  TA -> $( let x = fromIntegral $ ord 'A' :: Word8 in [| x |] )
-  TN -> $( let x = fromIntegral $ ord 'N' :: Word8 in [| x |] )
-  TO -> $( let x = fromIntegral $ ord 'O' :: Word8 in [| x |] )
+  TM -> fromIntegral $ ord 'M'
+  TH -> fromIntegral $ ord 'H'
+  TI -> fromIntegral $ ord 'I'
+  TK -> fromIntegral $ ord 'K'
+  TA -> fromIntegral $ ord 'A'
+  TN -> fromIntegral $ ord 'N'
+  TO -> fromIntegral $ ord 'O'
 {-# INLINE ct2i #-}
 
 getCTypes :: Int -> Word8
@@ -64,9 +64,9 @@ getCTypes c
   | otherwise
   = ct2i TO
   where
-    m    = $(let x = fmap ord "一二三四五六七八九十百千万億兆" in [| x |])
-    h    = $(let x = fmap ord "々〆ヵヶ" in [| x |])
-    ksub = $(let x = fmap ord "ーｰ\xff9e" in [| x |])
+    m    = $( let x = fmap ord "一二三四五六七八九十百千万億兆" in [| x |] )
+    h    = $( let x = fmap ord "々〆ヵヶ" in [| x |] )
+    ksub = $( let x = fmap ord "ーｰ\xff9e" in [| x |] )
 {-# INLINABLE getCTypes #-}
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
