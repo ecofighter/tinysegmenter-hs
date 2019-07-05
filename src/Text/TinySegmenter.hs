@@ -15,14 +15,14 @@ import qualified Data.Text.Array               as TA
 import           Data.Word
 import           GHC.Exts
 
--- markers, which values are outside of unicode code point
-b1,b2,b3,e1,e2,e3 :: Int#
-b1 = 0x110001#
-b2 = 0x110002#
-b3 = 0x110003#
-e1 = 0x110004#
-e2 = 0x110005#
-e3 = 0x110006#
+-- Markers, whose values are out of unicode code point range
+b1, b2, b3, e1, e2, e3 :: Int
+b1 = 0x110001
+b2 = 0x110002
+b3 = 0x110003
+e1 = 0x110004
+e2 = 0x110005
+e3 = 0x110006
 
 data Marker = U | O | B
 data CTypes = TM | TH | TI | TK | TA | TN | TO
@@ -71,20 +71,18 @@ getCTypes c
     ksub = $([| S.fromList $ fmap ord "ーｰ\xff9e" |])
 {-# INLINABLE getCTypes #-}
 
-takeThree :: T.Text -> (# Int#, Int#, Int#, T.Text #)
+takeThree :: T.Text -> (# Int, Int, Int, T.Text #)
 takeThree text = case T.uncons text of
   Nothing -> (# e1, e2, e3, text #)
-  Just (C# ca, ra) -> case T.uncons ra of
-    Nothing -> (# ord# ca, e1, e2, ra #)
-    Just (C# cb, rb) -> case T.uncons rb of
-      Nothing -> (# ord# ca, ord# cb, e1, rb #)
-      Just (C# cc, rc) ->(# ord# ca, ord# cb, ord# cc, rc #)
+  Just (ca, ra) -> case T.uncons ra of
+    Nothing -> (# ord ca, e1, e2, ra #)
+    Just (cb, rb) -> case T.uncons rb of
+      Nothing -> (# ord ca, ord cb, e1, rb #)
+      Just (cc, rc) ->(# ord ca, ord cb, ord cc, rc #)
 {-# INLINE takeThree #-}
 
-takeOne :: T.Text -> (# (# Int#, T.Text #) | () #)
-takeOne text = case T.uncons text of
-  Nothing -> (# | () #)
-  Just (C# c, r) -> (# (# ord# c, r #) | #)
+takeOne :: T.Text -> Maybe (Int, T.Text)
+takeOne = fmap (\(c, r) -> (ord c, r)) . T.uncons
 {-# INLINE takeOne #-}
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
@@ -93,12 +91,12 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , p1 :: {-# UNPACK #-} !Word8
                         , p2 :: {-# UNPACK #-} !Word8
                         , p3 :: {-# UNPACK #-} !Word8
-                        , w1 :: {-# UNPACK #-} !Int#
-                        , w2 :: {-# UNPACK #-} !Int#
-                        , w3 :: {-# UNPACK #-} !Int#
-                        , w4 :: {-# UNPACK #-} !Int#
-                        , w5 :: {-# UNPACK #-} !Int#
-                        , w6 :: {-# UNPACK #-} !Int#
+                        , w1 :: {-# UNPACK #-} !Int
+                        , w2 :: {-# UNPACK #-} !Int
+                        , w3 :: {-# UNPACK #-} !Int
+                        , w4 :: {-# UNPACK #-} !Int
+                        , w5 :: {-# UNPACK #-} !Int
+                        , w6 :: {-# UNPACK #-} !Int
                         , c1 :: {-# UNPACK #-} !Word8
                         , c2 :: {-# UNPACK #-} !Word8
                         , c3 :: {-# UNPACK #-} !Word8
