@@ -65,9 +65,9 @@ getCTypes c
   | otherwise
   = ct2i TO
   where
-    !m    = $( let x = fmap ord "一二三四五六七八九十百千万億兆" in [| x |])
-    !h    = $( let x = fmap ord "々〆ヵヶ" in [| x |])
-    !ksub = $( let x = fmap ord "ーｰ\xff9e" in [| x |])
+    !m    = $(let x = fmap ord "一二三四五六七八九十百千万億兆" in [| x |])
+    !h    = $(let x = fmap ord "々〆ヵヶ" in [| x |])
+    !ksub = $(let x = fmap ord "ーｰ\xff9e" in [| x |])
 {-# INLINABLE getCTypes #-}
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
