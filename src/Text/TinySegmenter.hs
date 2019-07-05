@@ -1,6 +1,3 @@
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Rank2Types #-}
@@ -10,13 +7,13 @@ module Text.TinySegmenter where
 
 import           Control.Monad.ST
 import           Control.Monad.Trans.State
+import           Data.Bits
 import           Data.Char
 import qualified Data.HashSet                  as S
 import qualified Data.Text                     as T
 import qualified Data.Text.Array               as A
 import qualified Data.Text.Internal            as TI
 import           Data.Word
-import           GHC.Exts
 
 -- Markers, whose values are out of unicode code point range
 b1, b2, b3, e1, e2, e3 :: Int
@@ -74,14 +71,14 @@ getCTypes c
     ksub = $([| S.fromList $ fmap ord "ーｰ\xff9e" |])
 {-# INLINABLE getCTypes #-}
 
-takeThree :: T.Text -> (# Int, Int, Int, T.Text #)
+takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of
-  Nothing -> (# e1, e2, e3, text #)
+  Nothing -> (e1, e2, e3, text)
   Just (ca, ra) -> case T.uncons ra of
-    Nothing -> (# ord ca, e1, e2, ra #)
+    Nothing -> (ord ca, e1, e2, ra)
     Just (cb, rb) -> case T.uncons rb of
-      Nothing -> (# ord ca, ord cb, e1, rb #)
-      Just (cc, rc) ->(# ord ca, ord cb, ord cc, rc #)
+      Nothing -> (ord ca, ord cb, e1, rb)
+      Just (cc, rc) ->(ord ca, ord cb, ord cc, rc)
 {-# INLINE takeThree #-}
 
 takeOne :: T.Text -> Maybe (Int, T.Text)
@@ -89,9 +86,10 @@ takeOne = fmap (\(c, r) -> (ord c, r)) . T.uncons
 {-# INLINE takeOne #-}
 
 type Offset = Int
-type CharWriter = forall s. A.MArray s -> Offset -> ST s ()
-type ArrayLength = Int
-data WordBuilder = WB {-# UNPACK #-} !CharWriter !ArrayLength
+type Writer = forall s. A.MArray s -> Offset -> ST s ()
+data WordBuilder = WB { writer :: Writer
+                      , length :: {-# UNPACK #-} !Int
+                      }
 
 emptyWB :: WordBuilder
 emptyWB = WB (\_ _ -> return ()) 0
@@ -104,6 +102,20 @@ runWB (WB writer length) = TI.text arr 0 length
       writer arr' 0
       A.unsafeFreeze arr'
 {-# INLINABLE runWB #-}
+
+mkWriter :: Int -> Writer
+mkWriter x =
+  if x < 0x10000
+    then \arr offset -> do
+         A.unsafeWrite arr offset (fromIntegral x)
+    else \arr offset -> do
+         let m = x - 0x10000
+             upper = fromIntegral (shiftR m 10 + 0xD800)
+             lower = fromIntegral ((m .&. 0x3FF) + 0xDC00)
+         A.unsafeWrite arr offset upper
+         A.unsafeWrite arr (succ offset) upper
+  where
+{-# INLINE mkWriter #-}
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , wordBuilder :: {-# UNPACK #-} !WordBuilder
@@ -127,7 +139,7 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
 
 makeInitialState :: T.Text -> TokenizeState
 makeInitialState text =
-  let !(# a, b, c, rmn #) = takeThree text in
+  let !(a, b, c, rmn) = takeThree text in
   TS { remain = rmn
      , wordBuilder = emptyWB
      , score = bias
