@@ -9,7 +9,6 @@ import           Control.Monad.ST
 import           Control.Monad.Trans.State
 import           Data.Bits
 import           Data.Char
-import qualified Data.HashSet                  as S
 import qualified Data.Text                     as T
 import qualified Data.Text.Array               as A
 import qualified Data.Text.Internal            as TI
@@ -47,14 +46,14 @@ ct2i c = case c of
 
 getCTypes :: Int -> Int
 getCTypes c
-  | S.member c m
+  | c `elem` m
   = ct2i TM
-  | (ord '一' <= c && c <= ord '龠') || S.member c h
+  | (ord '一' <= c && c <= ord '龠') || c `elem` h
   = ct2i TH
   | ord 'ぁ' <= c && c <= ord 'ん'
   = ct2i TI
   | (ord 'ァ' <= c && c <= ord 'ヴ')
-    || (ord 'ｱ' <= c && c <= ord 'ﾝ') || S.member c ksub
+    || (ord 'ｱ' <= c && c <= ord 'ﾝ') || c `elem` ksub
   = ct2i TK
   | (ord 'a' <= c && c <= ord 'z')
     || (ord 'A' <= c && c <= ord 'Z')
@@ -66,9 +65,9 @@ getCTypes c
   | otherwise
   = ct2i TO
   where
-    m    = $([| S.fromList $ fmap ord "一二三四五六七八九十百千万億兆" |])
-    h    = $([| S.fromList $ fmap ord "々〆ヵヶ" |])
-    ksub = $([| S.fromList $ fmap ord "ーｰ\xff9e" |])
+    !m    = $( let x = fmap ord "一二三四五六七八九十百千万億兆" in [| x |])
+    !h    = $( let x = fmap ord "々〆ヵヶ" in [| x |])
+    !ksub = $( let x = fmap ord "ーｰ\xff9e" in [| x |])
 {-# INLINABLE getCTypes #-}
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
