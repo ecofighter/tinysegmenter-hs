@@ -28,14 +28,14 @@ e3 = 0x110006
 data Marker = U | O | B
 data CTypes = TM | TH | TI | TK | TA | TN | TO
 
-mk2i :: Marker -> Word8
+mk2i :: Marker -> Int
 mk2i m = case m of
   U -> $([| toEnum $ fromEnum 'U' |])
   O -> $([| toEnum $ fromEnum 'O' |])
   B -> $([| toEnum $ fromEnum 'B' |])
 {-# INLINE mk2i #-}
 
-ct2i :: CTypes -> Word8
+ct2i :: CTypes -> Int
 ct2i c = case c of
   TM -> $([| toEnum $ fromEnum 'M' |])
   TH -> $([| toEnum $ fromEnum 'H' |])
@@ -46,7 +46,7 @@ ct2i c = case c of
   TO -> $([| toEnum $ fromEnum 'O' |])
 {-# INLINE ct2i #-}
 
-getCTypes :: Int -> Word8
+getCTypes :: Int -> Int
 getCTypes c
   | S.member c m
   = ct2i TM
@@ -111,21 +111,21 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , token :: ![Word16]
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
-                        , p1 :: {-# UNPACK #-} !Word8
-                        , p2 :: {-# UNPACK #-} !Word8
-                        , p3 :: {-# UNPACK #-} !Word8
+                        , p1 :: {-# UNPACK #-} !Int
+                        , p2 :: {-# UNPACK #-} !Int
+                        , p3 :: {-# UNPACK #-} !Int
                         , w1 :: {-# UNPACK #-} !Int
                         , w2 :: {-# UNPACK #-} !Int
                         , w3 :: {-# UNPACK #-} !Int
                         , w4 :: {-# UNPACK #-} !Int
                         , w5 :: {-# UNPACK #-} !Int
                         , w6 :: {-# UNPACK #-} !Int
-                        , c1 :: {-# UNPACK #-} !Word8
-                        , c2 :: {-# UNPACK #-} !Word8
-                        , c3 :: {-# UNPACK #-} !Word8
-                        , c4 :: {-# UNPACK #-} !Word8
-                        , c5 :: {-# UNPACK #-} !Word8
-                        , c6 :: {-# UNPACK #-} !Word8
+                        , c1 :: {-# UNPACK #-} !Int
+                        , c2 :: {-# UNPACK #-} !Int
+                        , c3 :: {-# UNPACK #-} !Int
+                        , c4 :: {-# UNPACK #-} !Int
+                        , c5 :: {-# UNPACK #-} !Int
+                        , c6 :: {-# UNPACK #-} !Int
                         }
 
 makeInitialState :: T.Text -> TokenizeState
