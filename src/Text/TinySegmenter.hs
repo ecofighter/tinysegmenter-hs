@@ -101,14 +101,14 @@ splitToWord16 c = (upper, lower)
 tokenToText :: [Word16] -> Int -> T.Text
 tokenToText xs size = TI.text array 0 size
   where
-    !array = runST $ do
+    array = runST $ do
       arr <- A.new size
-      let ys = zip xs [(size - 1) .. 0]
-      forM_ ys $ \(c, i) -> A.unsafeWrite arr i c
+      mapM_ (\(c, i) -> A.unsafeWrite arr i c) $ zip xs [(size-1) .. 0]
       A.unsafeFreeze arr
+{-# INLINABLE tokenToText #-}
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
-                        , token :: {-# UNPACK #-} ![Word16]
+                        , token :: ![Word16]
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
                         , p1 :: {-# UNPACK #-} !Word8
