@@ -5,6 +5,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Text.TinySegmenter where
 
+import           Control.Monad
 import           Control.Monad.ST
 import           Control.Monad.Trans.State
 import           Data.Bits
@@ -85,40 +86,30 @@ takeOne :: T.Text -> Maybe (Int, T.Text)
 takeOne = fmap (\(c, r) -> (ord c, r)) . T.uncons
 {-# INLINE takeOne #-}
 
-type Offset = Int
-type Writer = forall s. A.MArray s -> Offset -> ST s ()
-data WordBuilder = WB { writer :: Writer
-                      , length :: {-# UNPACK #-} !Int
-                      }
+isTwo :: Int -> Bool
+isTwo = (< 0x10000)
+{-# INLINE isTwo #-}
 
-emptyWB :: WordBuilder
-emptyWB = WB (\_ _ -> return ()) 0
-
-runWB :: WordBuilder -> T.Text
-runWB (WB writer length) = TI.text arr 0 length
+splitToWord16 :: Int -> (Word16, Word16)
+splitToWord16 c = (upper, lower)
   where
-    arr = runST $ do
-      arr' <- A.new length
-      writer arr' 0
-      A.unsafeFreeze arr'
-{-# INLINABLE runWB #-}
+    m     = c - 0x10000
+    upper = fromIntegral (shiftR m 10 + 0xD800)
+    lower = fromIntegral ((m .&. 0x3FF) + 0xDC00)
+{-# INLINE splitToWord16 #-}
 
-mkWriter :: Int -> Writer
-mkWriter x =
-  if x < 0x10000
-    then \arr offset -> do
-         A.unsafeWrite arr offset (fromIntegral x)
-    else \arr offset -> do
-         let m = x - 0x10000
-             upper = fromIntegral (shiftR m 10 + 0xD800)
-             lower = fromIntegral ((m .&. 0x3FF) + 0xDC00)
-         A.unsafeWrite arr offset upper
-         A.unsafeWrite arr (succ offset) upper
+tokenToText :: [Word16] -> Int -> T.Text
+tokenToText xs size = TI.text array 0 size
   where
-{-# INLINE mkWriter #-}
+    !array = runST $ do
+      arr <- A.new size
+      let ys = zip xs [(size - 1) .. 0]
+      forM_ ys $ \(c, i) -> A.unsafeWrite arr i c
+      A.unsafeFreeze arr
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
-                        , wordBuilder :: {-# UNPACK #-} !WordBuilder
+                        , token :: {-# UNPACK #-} ![Word16]
+                        , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
                         , p1 :: {-# UNPACK #-} !Word8
                         , p2 :: {-# UNPACK #-} !Word8
@@ -141,7 +132,8 @@ makeInitialState :: T.Text -> TokenizeState
 makeInitialState text =
   let !(a, b, c, rmn) = takeThree text in
   TS { remain = rmn
-     , wordBuilder = emptyWB
+     , token = []
+     , tokenLength = 0
      , score = bias
      , p1 = mk2i U
      , p2 = mk2i U
