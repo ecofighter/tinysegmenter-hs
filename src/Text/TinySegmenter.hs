@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -86,11 +85,13 @@ takeOne :: T.Text -> Maybe (Int, T.Text)
 takeOne = fmap (\(c, r) -> (ord c, r)) . T.uncons
 {-# INLINE takeOne #-}
 
-isTwo :: Int -> Bool
-isTwo = (< 0x10000)
-{-# INLINE isTwo #-}
+isPair :: Int -> Bool
+isPair = (< 0x10000)
+{-# INLINE isPair #-}
 
-splitToWord16 :: Int -> (Word16, Word16)
+type Upper = Word16
+type Lower = Word16
+splitToWord16 :: Int -> (Upper, Lower)
 splitToWord16 c = (upper, lower)
   where
     m     = c - 0x10000
