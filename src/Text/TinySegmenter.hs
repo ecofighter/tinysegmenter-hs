@@ -1,16 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes #-}
 module Text.TinySegmenter where
 
 import           Control.Monad.ST
-import           Control.Monad.Trans.State
 import           Data.Bits
 import           Data.Char
 import qualified Data.Text                     as T
 import qualified Data.Text.Array               as A
 import qualified Data.Text.Internal            as TI
+import qualified Data.HashMap.Strict as M
 import           Data.Word
 
 -- Markers, whose values are out of unicode code point range
@@ -64,9 +61,9 @@ getCTypes c
   | otherwise
   = ct2i TO
   where
-    m    = $( let x = fmap ord "一二三四五六七八九十百千万億兆" in [| x |] )
-    h    = $( let x = fmap ord "々〆ヵヶ" in [| x |] )
-    ksub = $( let x = fmap ord "ーｰ\xff9e" in [| x |] )
+    m    = fmap ord "一二三四五六七八九十百千万億兆"
+    h    = fmap ord "々〆ヵヶ"
+    ksub = fmap ord "ーｰ\xff9e"
 {-# INLINABLE getCTypes #-}
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
@@ -153,3 +150,39 @@ initialState text =
   where
     bias = -332
 {-# INLINABLE initialState #-}
+
+h = ct2i TH
+i = ct2i TI
+k = ct2i TK
+o = ct2i TO
+a = ct2i TA
+n = ct2i TN
+m = ct2i TM
+
+bc1 :: (Word8, Word8) -> Int
+bc1 t
+  | t == (h, h) = 6
+  | t == (i, i) = 2461
+  | t == (k, h) = 406
+  | t == (o, h) = -1378
+
+bc2 :: (Word8, Word8) -> Int
+bc2 t
+  | t == (a, a) = -3267
+  | t == (a, i) = 2744
+  | t == (a, n) = -878
+  | t == (h, h) = -4070
+  | t == (h, m) = -1711
+  | t == (h, n) = 4012
+  | t == (h, o) = 3761
+  | t == (i, a) = 1327
+  | t == (i, h) = -1184
+  | t == (i, i) = -1332
+  | t == (i, k) = 1721
+  | t == (i, o) = 5492
+  | t == (k, i) = 3831
+  | t == (k, k) = -8741
+  | t == (m, h) = -3132
+  | t == (m, k) = 3334
+  | t == (o, o) = -2920
+

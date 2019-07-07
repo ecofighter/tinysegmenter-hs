@@ -19,7 +19,7 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:     Text.TinySegmenter
-  -- other-modules:
+  other-modules:       Text.Score
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13
                      , transformers
