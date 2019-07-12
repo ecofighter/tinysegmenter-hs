@@ -1,29 +1,20 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
-module Text.TinySegmenter where
+module Text.TinySegmenter(tokenize) where
 
 import           Control.Monad
 import           Control.Monad.ST
 import           Control.Monad.Trans.State.Strict
 import           Data.Bits
 import           Data.Char
+import qualified Data.List                     as L
 import qualified Data.Text                     as T
 import qualified Data.Text.Array               as A
 import qualified Data.Text.Internal            as TI
-import qualified Data.HashMap.Strict as M
+import qualified Data.HashMap.Strict           as M
 import           Data.Word
 import           Text.Score
 
 bias = -332
-
--- -- Markers, whose values are out of unicode code point range
--- b1, b2, b3, e1, e2, e3 :: Int
--- b1 = 0x110001
--- b2 = 0x110002
--- b3 = 0x110003
--- e1 = 0x110004
--- e2 = 0x110005
--- e3 = 0x110006
 
 data Marker = U | O | B
 data CTypes = TM | TH | TI | TK | TA | TN | TO
@@ -130,64 +121,67 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , c6 :: {-# UNPACK #-} !Word8
                         }
 
-
 initialState :: T.Text -> TokenizeState
 initialState text =
-  let (a, b, c, rmn) = takeThree text in
-  TS { remain = rmn
-     , token = []
-     , tokenLength = 0
-     , score = bias
-     , p1 = mk2i U
-     , p2 = mk2i U
-     , p3 = mk2i U
-     , w1 = b1
-     , w2 = b2
-     , w3 = b3
-     , w4 = a
-     , w5 = b
-     , w6 = c
-     , c1 = mk2i O
-     , c2 = mk2i O
-     , c3 = mk2i O
-     , c4 = getCTypes a
-     , c5 = getCTypes b
-     , c6 = getCTypes c
-     }
-  where
+  let (a, b, c, rmn) = takeThree text
+  in  TS { remain      = rmn
+         , token       = []
+         , tokenLength = 0
+         , score       = bias
+         , p1          = mk2i U
+         , p2          = mk2i U
+         , p3          = mk2i U
+         , w1          = b1
+         , w2          = b2
+         , w3          = b3
+         , w4          = a
+         , w5          = b
+         , w6          = c
+         , c1          = mk2i O
+         , c2          = mk2i O
+         , c3          = mk2i O
+         , c4          = getCTypes a
+         , c5          = getCTypes b
+         , c6          = getCTypes c
+         }
 {-# INLINABLE initialState #-}
 
 moveNext :: State TokenizeState ()
 moveNext = do
   TS {..} <- get
-  let (newW6, newRemain) =
-        if T.length remain > 0 then
-          (ord $ T.head remain, T.tail remain)
-        else if w6 == e1 then
-          (e1, T.empty)
+  let (newToken, newTokenLength) =
+        if w3 == b3 then
+          ([], 0)
+        else if isPair w3 then
+          let (upper, lower) = splitToWord16 w3
+          in (lower : upper : token, tokenLength + 2)
         else
-          (e2, T.empty)
-  put $ TS { remain = newRemain
-           , token = token
-           , tokenLength = tokenLength
-           , score = bias
-           , p1 = p1
-           , p2 = p2
-           , p3 = p3
-           , w1 = w2
-           , w2 = w3
-           , w3 = w4
-           , w4 = w5
-           , w5 = w6
-           , w6 = newW6
-           , c1 = c2
-           , c2 = c3
-           , c3 = c4
-           , c4 = c5
-           , c5 = c6
-           , c6 = getCTypes newW6
+          (toEnum w3 : token, tokenLength + 1)
+  let (newW6, newRemain)
+        | T.length remain > 0 = (ord $ T.head remain, T.tail remain)
+        | w6 == e1            = (e1, T.empty)
+        | otherwise           = (e2, T.empty)
+  put $ TS { remain      = newRemain
+           , token       = newToken
+           , tokenLength = newTokenLength
+           , score       = bias
+           , p1          = p1
+           , p2          = p2
+           , p3          = p3
+           , w1          = w2
+           , w2          = w3
+           , w3          = w4
+           , w4          = w5
+           , w5          = w6
+           , w6          = newW6
+           , c1          = c2
+           , c2          = c3
+           , c3          = c4
+           , c4          = c5
+           , c5          = c6
+           , c6          = getCTypes newW6
            }
-  return ()
+{-# INLINABLE moveNext #-}
 
 updateScore :: State TokenizeState ()
 updateScore = do
@@ -236,7 +230,39 @@ updateScore = do
     {-# INLINE update #-}
 {-# INLINABLE updateScore #-}
 
-evalScore :: State TokenizeState Bool
+evalScore :: State TokenizeState (Maybe T.Text)
 evalScore = do
-  now <- gets score
-  return $ now > 0
+  s@TS {..} <- get
+  if score > 0 then do
+    let word = tokenToText token tokenLength
+    put $ s { token = []
+            , tokenLength = 0
+            , p1 = p2
+            , p2 = p3
+            , p3 = b
+            }
+    return $ Just word
+  else do
+    put $ s { p1 = p2
+            , p2 = p3
+            , p3 = o
+            }
+    return Nothing
+{-# INLINABLE evalScore #-}
+
+tokenizeM :: State TokenizeState (Maybe T.Text)
+tokenizeM = do
+  moveNext
+  updateScore
+  evalScore
+{-# INLINABLE tokenizeM #-}
+
+tokenize :: T.Text -> [T.Text]
+tokenize text =
+  let func = runState tokenizeM
+      func' s = case func s of
+        (Just t , s') -> Just (t, s')
+        (Nothing, _ ) -> Nothing
+      s = initialState text
+  in  L.unfoldr func' s
+{-# INLINABLE tokenize #-}
