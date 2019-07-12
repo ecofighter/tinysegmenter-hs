@@ -1,7 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 module Text.TinySegmenter where
 
+import           Control.Monad
 import           Control.Monad.ST
+import           Control.Monad.Trans.State.Strict
 import           Data.Bits
 import           Data.Char
 import qualified Data.Text                     as T
@@ -10,6 +13,8 @@ import qualified Data.Text.Internal            as TI
 import qualified Data.HashMap.Strict as M
 import           Data.Word
 import           Text.Score
+
+bias = -332
 
 -- -- Markers, whose values are out of unicode code point range
 -- b1, b2, b3, e1, e2, e3 :: Int
@@ -105,7 +110,7 @@ tokenToText xs size = TI.text array 0 size
 {-# INLINABLE tokenToText #-}
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
-                        , token :: ![Word16]
+                        , token :: [Word16]
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
                         , p1 :: {-# UNPACK #-} !Word8
@@ -125,9 +130,10 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , c6 :: {-# UNPACK #-} !Word8
                         }
 
+
 initialState :: T.Text -> TokenizeState
 initialState text =
-  let !(a, b, c, rmn) = takeThree text in
+  let (a, b, c, rmn) = takeThree text in
   TS { remain = rmn
      , token = []
      , tokenLength = 0
@@ -149,6 +155,88 @@ initialState text =
      , c6 = getCTypes c
      }
   where
-    bias = -332
 {-# INLINABLE initialState #-}
 
+moveNext :: State TokenizeState ()
+moveNext = do
+  TS {..} <- get
+  let (newW6, newRemain) =
+        if T.length remain > 0 then
+          (ord $ T.head remain, T.tail remain)
+        else if w6 == e1 then
+          (e1, T.empty)
+        else
+          (e2, T.empty)
+  put $ TS { remain = newRemain
+           , token = token
+           , tokenLength = tokenLength
+           , score = bias
+           , p1 = p1
+           , p2 = p2
+           , p3 = p3
+           , w1 = w2
+           , w2 = w3
+           , w3 = w4
+           , w4 = w5
+           , w5 = w6
+           , w6 = newW6
+           , c1 = c2
+           , c2 = c3
+           , c3 = c4
+           , c4 = c5
+           , c5 = c6
+           , c6 = getCTypes newW6
+           }
+  return ()
+
+updateScore :: State TokenizeState ()
+updateScore = do
+  modify $ \s -> update s $ bp1 (p1 s, p2 s)
+  modify $ \s -> update s $ bp2 (p2 s, p3 s)
+  modify $ \s -> update s $ uw1 (w1 s)
+  modify $ \s -> update s $ uw2 (w2 s)
+  modify $ \s -> update s $ uw3 (w3 s)
+  modify $ \s -> update s $ uw4 (w4 s)
+  modify $ \s -> update s $ uw5 (w5 s)
+  modify $ \s -> update s $ uw6 (w6 s)
+  modify $ \s -> update s $ bw1 (w2 s, w3 s)
+  modify $ \s -> update s $ bw2 (w3 s, w4 s)
+  modify $ \s -> update s $ bw3 (w4 s, w5 s)
+  modify $ \s -> update s $ tw1 (w1 s, w2 s, w3 s)
+  modify $ \s -> update s $ tw2 (w2 s, w3 s, w4 s)
+  modify $ \s -> update s $ tw3 (w3 s, w4 s, w5 s)
+  modify $ \s -> update s $ tw4 (w4 s, w5 s, w6 s)
+  modify $ \s -> update s $ uc1 (c1 s)
+  modify $ \s -> update s $ uc2 (c2 s)
+  modify $ \s -> update s $ uc3 (c3 s)
+  modify $ \s -> update s $ uc4 (c4 s)
+  modify $ \s -> update s $ uc5 (c5 s)
+  modify $ \s -> update s $ uc6 (c6 s)
+  modify $ \s -> update s $ bc1 (c2 s, c3 s)
+  modify $ \s -> update s $ bc2 (c3 s, c4 s)
+  modify $ \s -> update s $ bc3 (c4 s, c5 s)
+  modify $ \s -> update s $ tc1 (c1 s, c2 s, c3 s)
+  modify $ \s -> update s $ tc2 (c2 s, c3 s, c4 s)
+  modify $ \s -> update s $ tc3 (c3 s, c4 s, c5 s)
+  modify $ \s -> update s $ tc4 (c4 s, c5 s, c6 s)
+  modify $ \s -> update s $ uq1 (p1 s, c1 s)
+  modify $ \s -> update s $ uq2 (p2 s, c2 s)
+  modify $ \s -> update s $ uq3 (p3 s, c3 s)
+  modify $ \s -> update s $ bq1 (p2 s, c2 s, c3 s)
+  modify $ \s -> update s $ bq2 (p2 s, c3 s, c4 s)
+  modify $ \s -> update s $ bq3 (p3 s, c2 s, c3 s)
+  modify $ \s -> update s $ bq4 (p3 s, c3 s, c4 s)
+  modify $ \s -> update s $ tq1 (p2 s, c1 s, c2 s, c3 s)
+  modify $ \s -> update s $ tq2 (p2 s, c2 s, c3 s, c4 s)
+  modify $ \s -> update s $ tq3 (p3 s, c1 s, c2 s, c3 s)
+  modify $ \s -> update s $ tq4 (p3 s, c2 s, c3 s, c4 s)
+  where
+    update :: TokenizeState -> Int -> TokenizeState
+    update s i = s { score = i }
+    {-# INLINE update #-}
+{-# INLINABLE updateScore #-}
+
+evalScore :: State TokenizeState Bool
+evalScore = do
+  now <- gets score
+  return $ now > 0

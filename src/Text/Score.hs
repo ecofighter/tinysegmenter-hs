@@ -650,51 +650,51 @@ tw4 t | t == (ord 'い', ord 'う', ord '.') = 8576
       | t == (ord 'よ', ord 'る', ord 'と') = 5865
 {-# INLINE tw4 #-}
 
-uc1 :: Int -> Int
-uc1 t | t == ord 'A' = 484
-      | t == ord 'K' = 93
-      | t == ord 'M' = 645
-      | t == ord 'O' = -505
+uc1 :: Word8 -> Int
+uc1 t | t == toEnum (ord 'A') = 484
+      | t == toEnum (ord 'K') = 93
+      | t == toEnum (ord 'M') = 645
+      | t == toEnum (ord 'O') = -505
 {-# INLINE uc1 #-}
 
-uc2 :: Int -> Int
-uc2 t | t == ord 'A' = 819
-      | t == ord 'H' = 1059
-      | t == ord 'I' = 409
-      | t == ord 'M' = 3987
-      | t == ord 'N' = 5775
-      | t == ord 'O' = 646
+uc2 :: Word8 -> Int
+uc2 t | t == toEnum (ord 'A') = 819
+      | t == toEnum (ord 'H') = 1059
+      | t == toEnum (ord 'I') = 409
+      | t == toEnum (ord 'M') = 3987
+      | t == toEnum (ord 'N') = 5775
+      | t == toEnum (ord 'O') = 646
 {-# INLINE uc2 #-}
 
-uc3 :: Int -> Int
-uc3 t | t == ord 'A' = -1370
-      | t == ord 'I' = 2311
+uc3 :: Word8 -> Int
+uc3 t | t == toEnum (ord 'A') = -1370
+      | t == toEnum (ord 'I') = 2311
 {-# INLINE uc3 #-}
 
-uc4 :: Int -> Int
-uc4 t | t == ord 'A' = -2643
-      | t == ord 'H' = 1809
-      | t == ord 'I' = -1032
-      | t == ord 'K' = -3450
-      | t == ord 'M' = 3565
-      | t == ord 'N' = 3876
-      | t == ord 'O' = 6646
+uc4 :: Word8 -> Int
+uc4 t | t == toEnum (ord 'A') = -2643
+      | t == toEnum (ord 'H') = 1809
+      | t == toEnum (ord 'I') = -1032
+      | t == toEnum (ord 'K') = -3450
+      | t == toEnum (ord 'M') = 3565
+      | t == toEnum (ord 'N') = 3876
+      | t == toEnum (ord 'O') = 6646
 {-# INLINE uc4 #-}
 
-uc5 :: Int -> Int
-uc5 t | t == ord 'H' = 313
-      | t == ord 'I' = -1238
-      | t == ord 'K' = -799
-      | t == ord 'M' = 539
-      | t == ord 'O' = -831
+uc5 :: Word8 -> Int
+uc5 t | t == toEnum (ord 'H') = 313
+      | t == toEnum (ord 'I') = -1238
+      | t == toEnum (ord 'K') = -799
+      | t == toEnum (ord 'M') = 539
+      | t == toEnum (ord 'O') = -831
 {-# INLINE uc5 #-}
 
-uc6 :: Int -> Int
-uc6 t | t == ord 'H' = -506
-      | t == ord 'I' = -253
-      | t == ord 'K' = 87
-      | t == ord 'M' = 247
-      | t == ord 'O' = -387
+uc6 :: Word8 -> Int
+uc6 t | t == toEnum (ord 'H') = -506
+      | t == toEnum (ord 'I') = -253
+      | t == toEnum (ord 'K') = 87
+      | t == toEnum (ord 'M') = 247
+      | t == toEnum (ord 'O') = -387
 {-# INLINE uc6 #-}
 
 up1 :: Int -> Int
