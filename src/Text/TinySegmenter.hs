@@ -9,15 +9,16 @@ import qualified Data.Text.Array               as A
 import qualified Data.Text.Internal            as TI
 import qualified Data.HashMap.Strict as M
 import           Data.Word
+import           Text.Score
 
--- Markers, whose values are out of unicode code point range
-b1, b2, b3, e1, e2, e3 :: Int
-b1 = 0x110001
-b2 = 0x110002
-b3 = 0x110003
-e1 = 0x110004
-e2 = 0x110005
-e3 = 0x110006
+-- -- Markers, whose values are out of unicode code point range
+-- b1, b2, b3, e1, e2, e3 :: Int
+-- b1 = 0x110001
+-- b2 = 0x110002
+-- b3 = 0x110003
+-- e1 = 0x110004
+-- e2 = 0x110005
+-- e3 = 0x110006
 
 data Marker = U | O | B
 data CTypes = TM | TH | TI | TK | TA | TN | TO
