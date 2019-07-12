@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Text.TinySegmenter
   ( tokenize
+  , tok
   )
 where
 
@@ -179,22 +180,6 @@ updateScore = do
   {-# INLINE update #-}
 {-# INLINABLE updateScore #-}
 
-evalScore :: State TokenizeState ()
-evalScore = do
-  s@TS {..} <- get
-  if score > 0
-    then do
-      let word = tokenToText token tokenLength
-      put $ s { results     = word : results
-              , token       = []
-              , tokenLength = 0
-              , p1          = p2
-              , p2          = p3
-              , p3          = b
-              }
-    else put $ s { p1 = p2, p2 = p3, p3 = o }
-{-# INLINABLE evalScore #-}
-
 pushToToken :: State TokenizeState ()
 pushToToken = do
   s@TS {..} <- get
@@ -219,6 +204,25 @@ tailToResult = do
   put $ s { results = word : results, token = [], tokenLength = 0 }
 {-# INLINABLE tailToResult #-}
 
+evalScore :: State TokenizeState (Maybe T.Text)
+evalScore = do
+  s@TS {..} <- get
+  if score > 0
+    then do
+      let word = tokenToText token tokenLength
+      put $ s { results     = word : results
+              , token       = []
+              , tokenLength = 0
+              , p1          = p2
+              , p2          = p3
+              , p3          = b
+              }
+      return $ Just word
+    else do
+      put $ s { p1 = p2, p2 = p3, p3 = o }
+      return Nothing
+{-# INLINABLE evalScore #-}
+
 tokenizeM :: State TokenizeState [T.Text]
 tokenizeM = do
   moveNext
@@ -236,3 +240,25 @@ tokenizeM = do
 tokenize :: T.Text -> [T.Text]
 tokenize text = evalState tokenizeM $ initialState text
 {-# INLINABLE tokenize #-}
+
+tokM :: State TokenizeState (Maybe T.Text, Bool)
+tokM = do
+  moveNext
+  pushToToken
+  updateScore
+  word <- evalScore
+  flag <- isFinished
+  return (word, flag)
+
+tok :: T.Text -> [T.Text]
+tok text =
+  let f = runState tokM
+      g x = case f x of
+        ((Just t, _), s) -> Just (t, s)
+        ((Nothing, isFinished), s) ->
+          if isFinished then
+            Nothing
+          else
+            g s
+      s = initialState text
+  in L.unfoldr g s
