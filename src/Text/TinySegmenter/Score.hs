@@ -1,7 +1,20 @@
-module Text.Score where
+module Text.TinySegmenter.Score ( bias, b1, b2, b3, e1, e2, e3
+                                , h, i, k, o, a, n, m, b, u
+                                , getCTypes
+                                , bp1, bp2, uw1, uw2, uw3, uw4, uw5, uw6
+                                , bw1, bw2, bw3, tw1, tw2, tw3, tw4
+                                , uc1, uc2, uc3, uc4, uc5, uc6
+                                , bc1, bc2, bc3, tc1, tc2, tc3, tc4
+                                , uq1, uq2, uq3, bq1, bq2, bq3, bq4
+                                , tq1, tq2, tq3, tq4
+                                ) where
 
 import           Data.Char
 import           Data.Word
+
+-- bias
+bias :: Int
+bias = -332
 
 -- markers, out side of the range of unicode codepoint
 b1, b2, b3, e1, e2, e3 :: Int
@@ -11,6 +24,32 @@ b3 = 0x110003
 e1 = 0x110004
 e2 = 0x110005
 e3 = 0x110006
+
+getCTypes :: Int -> Word8
+getCTypes c
+  | c `elem` ml
+  = m
+  | (ord '一' <= c && c <= ord '龠') || c `elem` hl
+  = h
+  | ord 'ぁ' <= c && c <= ord 'ん'
+  = i
+  | (ord 'ァ' <= c && c <= ord 'ヴ')
+    || (ord 'ｱ' <= c && c <= ord 'ﾝ') || c `elem` ksubl
+  = k
+  | (ord 'a' <= c && c <= ord 'z')
+    || (ord 'A' <= c && c <= ord 'Z')
+    || (ord 'ａ' <= c && c <= ord 'ｚ')
+    || (ord 'Ａ' <= c && c <= ord 'Ｚ')
+  = a
+  | (ord '0' <= c && c <= ord '9') || (ord '０' <= c && c <= ord '９')
+  = n
+  | otherwise
+  = o
+  where
+    ml    = fmap ord "一二三四五六七八九十百千万億兆"
+    hl    = fmap ord "々〆ヵヶ"
+    ksubl = fmap ord "ーｰ\xff9e"
+{-# INLINABLE getCTypes #-}
 
 -- Words
 h, i, k, o, a, n, m, b, u :: Word8
@@ -30,6 +69,7 @@ bc1 t | t == (h, h) = 6
       | t == (i, i) = 2461
       | t == (k, h) = 406
       | t == (o, h) = -1378
+      | otherwise = 0
 {-# INLINE bc1 #-}
 
 bc2 :: (Word8, Word8) -> Int
@@ -50,6 +90,7 @@ bc2 t | t == (a, a) = -3267
       | t == (m, h) = -3132
       | t == (m, k) = 3334
       | t == (o, o) = -2920
+      | otherwise = 0
 {-# INLINE bc2 #-}
 
 bc3 :: (Word8, Word8) -> Int
@@ -64,6 +105,7 @@ bc3 t | t == (h, h) = 996
       | t == (m, m) = 4034
       | t == (o, a) = -1652
       | t == (o, h) = 266
+      | otherwise = 0
 {-# INLINE bc3 #-}
 
 bp1 :: (Word8, Word8) -> Int
@@ -71,11 +113,13 @@ bp1 t | t == (b, b) = 295
       | t == (o, b) = 304
       | t == (o, o) = -125
       | t == (u, b) = 352
+      | otherwise = 0
 {-# INLINE bp1 #-}
 
 bp2 :: (Word8, Word8) -> Int
 bp2 t | t == (b, o) = 60
       | t == (o, o) = -1762
+      | otherwise = 0
 {-# INLINE bp2 #-}
 
 bq1 :: (Word8, Word8, Word8) -> Int
@@ -93,6 +137,7 @@ bq1 t | t == (b, h, h) = 1150
       | t == (o, k, h) = -1020
       | t == (o, k, k) = 904
       | t == (o, o, o) = 2965
+      | otherwise = 0
 {-# INLINE bq1 #-}
 
 bq2 :: (Word8, Word8, Word8) -> Int
@@ -106,6 +151,7 @@ bq2 t | t == (b, h, h) = 118
       | t == (o, h, m) = -181
       | t == (o, i, h) = 153
       | t == (u, h, i) = -1146
+      | otherwise = 0
 {-# INLINE bq2 #-}
 
 bq3 :: (Word8, Word8, Word8) -> Int
@@ -125,6 +171,7 @@ bq3 t | t == (b, h, h) = -792
       | t == (o, k, o) = -2242
       | t == (o, m, h) = -2402
       | t == (o, o, o) = 11699
+      | otherwise = 0
 {-# INLINE bq3 #-}
 
 bq4 :: (Word8, Word8, Word8) -> Int
@@ -139,6 +186,7 @@ bq4 t | t == (b, h, h) = -3895
       | t == (o, h, h) = 266
       | t == (o, h, h) = -2036
       | t == (o, n, n) = -973
+      | otherwise = 0
 {-# INLINE bq4 #-}
 
 bw1 :: (Int, Int) -> Int
@@ -213,6 +261,7 @@ bw1 t | t == (ord ',', ord 'と') = 660
       | t == (b1, ord 'あ') = 1404
       | t == (b1, ord '同') = 542
       | t == (ord '｣', ord 'と') = 1682
+      | otherwise = 0
 {-# INLINE bw1 #-}
 
 bw2 :: (Int, Int) -> Int
@@ -337,6 +386,7 @@ bw2 t | t == (ord '.', ord '.') = -11822
       | t == (ord '米', ord '国') = -4268
       | t == (ord '１', ord '１') = -669
       | t == (ord 'ｸ', ord 'ﾞ') = 1319
+      | otherwise = 0
 {-# INLINE bw2 #-}
 
 bw3 :: (Int, Int) -> Int
@@ -454,6 +504,7 @@ bw3 t | t == (ord 'あ', ord 'た') = -2194
       | t == (ord '日', ord '、') = 974
       | t == (ord '社', ord '会') = 2024
       | t == (ord 'ｶ', ord '月') = 990
+      | otherwise = 0
 {-# INLINE bw3 #-}
 
 tc1 :: (Word8, Word8, Word8) -> Int
@@ -469,6 +520,7 @@ tc1 t | t == (a, a, a) = 1093
       | t == (i, o, m) = 467
       | t == (m, m, h) = 187
       | t == (o, o, i) = -1832
+      | otherwise = 0
 {-# INLINE tc1 #-}
 
 tc2 :: (Word8, Word8, Word8) -> Int
@@ -478,6 +530,7 @@ tc2 t | t == (h, h, o) = 2088
       | t == (i, h, i) = -1965
       | t == (k, k, h) = 703
       | t == (o, i, i) = -2649
+      | otherwise = 0
 {-# INLINE tc2 #-}
 
 tc3 :: (Word8, Word8, Word8) -> Int
@@ -504,6 +557,7 @@ tc3 t | t == (a, a, a) = -294
       | t == (n, n, h) = -1689
       | t == (n, n, o) = 662
       | t == (o, h, o) = -3393
+      | otherwise = 0
 {-# INLINE tc3 #-}
 
 tc4 :: (Word8, Word8, Word8) -> Int
@@ -530,6 +584,7 @@ tc4 t | t == (h, h, h) = -203
       | t == (m, m, h) = -241
       | t == (m, m, m) = 661
       | t == (m, o, m) = 841
+      | otherwise = 0
 {-# INLINE tc4 #-}
 
 tq1 :: (Word8, Word8, Word8, Word8) -> Int
@@ -546,6 +601,7 @@ tq1 t | t == (b,h,h,h) = -227
       | t == (o,h,i,h) = 249
       | t == (o,i,h,i) = 200
       | t == (o,i,i,h) = -68
+      | otherwise = 0
 {-# INLINE tq1 #-}
 
 tq2 :: (Word8, Word8, Word8, Word8) -> Int
@@ -553,6 +609,7 @@ tq2 t | t == (b,i,h,h) = -1401
       | t == (b,i,i,i) = -1033
       | t == (b,k,a,k) = -543
       | t == (b,o,o,o) = -5591
+      | otherwise = 0
 {-# INLINE tq2 #-}
 
 tq3 :: (Word8, Word8, Word8, Word8) -> Int
@@ -576,6 +633,7 @@ tq3 t | t == (b,h,h,h) = 478
       | t == (o,k,k,a) = 679
       | t == (o,o,h,h) = 110
       | t == (o,o,i,i) = -685
+      | otherwise = 0
 {-# INLINE tq3 #-}
 
 tq4 :: (Word8, Word8, Word8, Word8) -> Int
@@ -595,11 +653,13 @@ tq4 t | t == (b,h,h,h) = -721
       | t == (o,i,i,h) = 626
       | t == (o,i,i,i) = -4007
       | t == (o,k,a,k) = -8156
+      | otherwise = 0
 {-# INLINE tq4 #-}
 
 tw1 :: (Int, Int, Int) -> Int
 tw1 t | t == (ord 'に', ord 'つ', ord 'い') = -4681
       | t == (ord '東', ord '京', ord '都') = 2026
+      | otherwise = 0
 {-# INLINE tw1 #-}
 
 tw2 :: (Int, Int, Int) -> Int
@@ -619,6 +679,7 @@ tw2 t | t == (ord 'あ', ord 'る', ord '程') = -2049
       | t == (ord '大', ord 'き', ord 'な') = -1255
       | t == (ord '対', ord 'し', ord 'て') = -2721
       | t == (ord '社', ord '会', ord '党') = -3216
+      | otherwise = 0
 {-# INLINE tw2 #-}
 
 tw3 :: (Int, Int, Int) -> Int
@@ -633,6 +694,7 @@ tw3 t | t == (ord 'い', ord 'た', ord 'だ') = -1734
       | t == (ord 'の', ord 'も', ord 'の') = -600
       | t == (ord 'れ', ord 'か', ord 'ら') = -3752
       | t == (ord '十', ord '二', ord '月') = -2287
+      | otherwise = 0
 {-# INLINE tw3 #-}
 
 tw4 :: (Int, Int, Int) -> Int
@@ -648,6 +710,7 @@ tw4 t | t == (ord 'い', ord 'う', ord '.') = 8576
       | t == (ord 'ま', ord 'せ', ord 'ん') = 1097
       | t == (ord 'よ', ord 'う', ord 'と') = -4258
       | t == (ord 'よ', ord 'る', ord 'と') = 5865
+      | otherwise = 0
 {-# INLINE tw4 #-}
 
 uc1 :: Word8 -> Int
@@ -655,6 +718,7 @@ uc1 t | t == toEnum (ord 'A') = 484
       | t == toEnum (ord 'K') = 93
       | t == toEnum (ord 'M') = 645
       | t == toEnum (ord 'O') = -505
+      | otherwise = 0
 {-# INLINE uc1 #-}
 
 uc2 :: Word8 -> Int
@@ -664,11 +728,13 @@ uc2 t | t == toEnum (ord 'A') = 819
       | t == toEnum (ord 'M') = 3987
       | t == toEnum (ord 'N') = 5775
       | t == toEnum (ord 'O') = 646
+      | otherwise = 0
 {-# INLINE uc2 #-}
 
 uc3 :: Word8 -> Int
 uc3 t | t == toEnum (ord 'A') = -1370
       | t == toEnum (ord 'I') = 2311
+      | otherwise = 0
 {-# INLINE uc3 #-}
 
 uc4 :: Word8 -> Int
@@ -679,6 +745,7 @@ uc4 t | t == toEnum (ord 'A') = -2643
       | t == toEnum (ord 'M') = 3565
       | t == toEnum (ord 'N') = 3876
       | t == toEnum (ord 'O') = 6646
+      | otherwise = 0
 {-# INLINE uc4 #-}
 
 uc5 :: Word8 -> Int
@@ -687,6 +754,7 @@ uc5 t | t == toEnum (ord 'H') = 313
       | t == toEnum (ord 'K') = -799
       | t == toEnum (ord 'M') = 539
       | t == toEnum (ord 'O') = -831
+      | otherwise = 0
 {-# INLINE uc5 #-}
 
 uc6 :: Word8 -> Int
@@ -695,19 +763,23 @@ uc6 t | t == toEnum (ord 'H') = -506
       | t == toEnum (ord 'K') = 87
       | t == toEnum (ord 'M') = 247
       | t == toEnum (ord 'O') = -387
+      | otherwise = 0
 {-# INLINE uc6 #-}
 
 up1 :: Int -> Int
 up1 t | t == ord 'O' = -214
+      | otherwise = 0
 {-# INLINE up1 #-}
 
 up2 :: Int -> Int
 up2 t | t == ord 'B' = 69
       | t == ord  'O' = 935
+      | otherwise = 0
 {-# INLINE up2 #-}
 
 up3 :: Int -> Int
 up3 t | t == ord 'B' = 189
+      | otherwise = 0
 {-# INLINE up3 #-}
 
 uq1 :: (Word8, Word8) -> Int
@@ -720,12 +792,14 @@ uq1 t | t == (b,h) = 21
       | t == (o,i) = 477
       | t == (o,k) = 410
       | t == (o,o) = -2422
+      | otherwise = 0
 {-# INLINE uq1 #-}
 
 uq2 :: (Word8, Word8) -> Int
 uq2 t | t == (b,h) = 216
       | t == (b,i) = 113
       | t == (o,k) = 1759
+      | otherwise = 0
 {-# INLINE uq2 #-}
 
 uq3 :: (Word8, Word8) -> Int
@@ -738,6 +812,7 @@ uq3 t | t == (b,a) = -479
       | t == (b,o) = 14761
       | t == (o,i) = -827
       | t == (o,n) = -3212
+      | otherwise = 0
 {-# INLINE uq3 #-}
 
 uw1 :: Int -> Int
@@ -779,6 +854,7 @@ uw1 t | t == ord ',' = 156
       | t == ord '都' = -718
       | t == ord '｢' = -463
       | t == ord '･' = -135
+      | otherwise = 0
 {-# INLINE uw1 #-}
 
 uw2 :: Int -> Int
@@ -889,6 +965,7 @@ uw2 t | t == ord ',' = -829
       | t == ord 'ｱ' = -587
       | t == ord 'ｶ' = 306
       | t == ord 'ｷ' = 568
+      | otherwise = 0
 {-# INLINE uw2 #-}
 
 uw3 :: Int -> Int
@@ -1108,6 +1185,7 @@ uw3 t | t == ord ',' = 4889
       | t == ord 'ﾙ' = 1591
       | t == ord 'ﾛ' = 2201
       | t == ord 'ﾝ' = 278
+      | otherwise = 0
 {-# INLINE uw3 #-}
 
 uw4 :: Int -> Int
@@ -1331,6 +1409,7 @@ uw4 t | t == ord ',' = 3930
       | t == ord 'ﾘ' = -541
       | t == ord 'ﾙ' = -856
       | t == ord 'ﾝ' = -3637
+      | otherwise = 0
 {-# INLINE uw4 #-}
 
 uw5 :: Int -> Int
@@ -1433,6 +1512,7 @@ uw5 t | t == ord ',' = 465
       | t == ord 'ｲ' = 241
       | t == ord 'ﾙ' = 451
       | t == ord 'ﾝ' = -343
+      | otherwise = 0
 {-# INLINE uw5 #-}
 
 uw6 :: Int -> Int
@@ -1489,4 +1569,5 @@ uw6 t | t == ord ',' = 227
       | t == e1 = 306
       | t == ord 'ﾙ' = -673
       | t == ord 'ﾝ' = -496
+      | otherwise = 0
 {-# INLINE uw6 #-}
