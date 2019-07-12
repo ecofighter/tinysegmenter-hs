@@ -149,14 +149,11 @@ initialState text =
 moveNext :: State TokenizeState ()
 moveNext = do
   TS {..} <- get
-  let (newToken, newTokenLength) =
-        if w3 == b3 then
-          ([], 0)
-        else if isPair w3 then
-          let (upper, lower) = splitToWord16 w3
-          in (lower : upper : token, tokenLength + 2)
-        else
-          (toEnum w3 : token, tokenLength + 1)
+  let (newToken, newTokenLength)
+        | w3 == b3  = ([], 0)
+        | isPair w3 = let (upper, lower) = splitToWord16 w3
+                      in  (lower : upper : token, tokenLength + 2)
+        | otherwise = (toEnum w3 : token, tokenLength + 1)
   let (newW6, newRemain)
         | T.length remain > 0 = (ord $ T.head remain, T.tail remain)
         | w6 == e1            = (e1, T.empty)
@@ -262,7 +259,9 @@ tokenize text =
   let func = runState tokenizeM
       func' s = case func s of
         (Just t , s') -> Just (t, s')
-        (Nothing, _ ) -> Nothing
+        (Nothing, s') -> if token s' /= []
+          then Just (tokenToText (token s') (tokenLength s'), s' { token = [] })
+          else Nothing
       s = initialState text
   in  L.unfoldr func' s
 {-# INLINABLE tokenize #-}
