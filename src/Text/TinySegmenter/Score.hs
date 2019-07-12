@@ -1,6 +1,7 @@
 module Text.TinySegmenter.Score ( bias, b1, b2, b3, e1, e2, e3
                                 , h, i, k, o, a, n, m, b, u
                                 , getCTypes
+                                , up1, up2, up3
                                 , bp1, bp2, uw1, uw2, uw3, uw4, uw5, uw6
                                 , bw1, bw2, bw3, tw1, tw2, tw3, tw4
                                 , uc1, uc2, uc3, uc4, uc5, uc6
@@ -46,9 +47,9 @@ getCTypes c
   | otherwise
   = o
   where
-    ml    = fmap ord "一二三四五六七八九十百千万億兆"
-    hl    = fmap ord "々〆ヵヶ"
-    ksubl = fmap ord "ーｰ\xff9e"
+    ml    = fmap ord ("一二三四五六七八九十百千万億兆" :: String)
+    hl    = fmap ord ("々〆ヵヶ" :: String)
+    ksubl = fmap ord ("ーｰ\xff9e" :: String)
 {-# INLINABLE getCTypes #-}
 
 -- Words
@@ -766,19 +767,19 @@ uc6 t | t == toEnum (ord 'H') = -506
       | otherwise = 0
 {-# INLINE uc6 #-}
 
-up1 :: Int -> Int
-up1 t | t == ord 'O' = -214
+up1 :: Word8 -> Int
+up1 t | t == o = -214
       | otherwise = 0
 {-# INLINE up1 #-}
 
-up2 :: Int -> Int
-up2 t | t == ord 'B' = 69
-      | t == ord  'O' = 935
+up2 :: Word8 -> Int
+up2 t | t == b = 69
+      | t == o = 935
       | otherwise = 0
 {-# INLINE up2 #-}
 
-up3 :: Int -> Int
-up3 t | t == ord 'B' = 189
+up3 :: Word8 -> Int
+up3 t | t == b = 189
       | otherwise = 0
 {-# INLINE up3 #-}
 

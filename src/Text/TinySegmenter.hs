@@ -1,5 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
-module Text.TinySegmenter(tokenize) where
+module Text.TinySegmenter
+  ( tokenize
+  )
+where
 
 import           Control.Monad
 import           Control.Monad.ST
@@ -13,44 +16,46 @@ import qualified Data.Text.Internal            as TI
 import           Data.Word
 import           Text.TinySegmenter.Score
 
+import qualified Data.Text.IO                  as T
+
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of
-  Nothing -> (e1, e2, e3, text)
+  Nothing       -> (e1, e2, e3, text)
   Just (ca, ra) -> case T.uncons ra of
-    Nothing -> (ord ca, e1, e2, ra)
+    Nothing       -> (ord ca, e1, e2, ra)
     Just (cb, rb) -> case T.uncons rb of
-      Nothing -> (ord ca, ord cb, e1, rb)
-      Just (cc, rc) ->(ord ca, ord cb, ord cc, rc)
+      Nothing       -> (ord ca, ord cb, e1, rb)
+      Just (cc, rc) -> (ord ca, ord cb, ord cc, rc)
 {-# INLINE takeThree #-}
 
-takeOne :: T.Text -> Maybe (Int, T.Text)
-takeOne = fmap (\(c, r) -> (ord c, r)) . T.uncons
-{-# INLINE takeOne #-}
-
 isPair :: Int -> Bool
-isPair = (< 0x10000)
+isPair c = c > 0x10000
 {-# INLINE isPair #-}
 
 type Upper = Word16
 type Lower = Word16
 splitToWord16 :: Int -> (Upper, Lower)
 splitToWord16 c = (upper, lower)
-  where
-    m     = c - 0x10000
-    upper = fromIntegral (shiftR m 10 + 0xD800)
-    lower = fromIntegral ((m .&. 0x3FF) + 0xDC00)
+ where
+  m     = c - 0x10000
+  upper = fromIntegral (shiftR m 10 + 0xD800)
+  lower = fromIntegral ((m .&. 0x3FF) + 0xDC00)
 {-# INLINE splitToWord16 #-}
 
 tokenToText :: [Word16] -> Int -> T.Text
 tokenToText xs size = TI.text array 0 size
-  where
-    array = runST $ do
-      arr <- A.new size
-      mapM_ (\(c, i) -> A.unsafeWrite arr i c) $ zip xs [(size-1) .. 0]
-      A.unsafeFreeze arr
+ where
+  array = runST $ do
+    let idxList =
+          let f x = if x < 0 then [] else x : f (pred x)
+          in  zip xs $ f (pred size)
+    arr <- A.new size
+    forM_ idxList (\(c, i) -> A.unsafeWrite arr i c)
+    A.unsafeFreeze arr
 {-# INLINABLE tokenToText #-}
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
+                        , results :: ![T.Text]
                         , token :: ![Word16]
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
@@ -70,11 +75,13 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , c5 :: {-# UNPACK #-} !Word8
                         , c6 :: {-# UNPACK #-} !Word8
                         }
+                     deriving (Show)
 
 initialState :: T.Text -> TokenizeState
 initialState text =
   let (a, b, c, rmn) = takeThree text
   in  TS { remain      = rmn
+         , results     = []
          , token       = []
          , tokenLength = 0
          , score       = bias
@@ -99,36 +106,34 @@ initialState text =
 moveNext :: State TokenizeState ()
 moveNext = do
   s@TS {..} <- get
-  let (newToken, newTokenLength)
-        | w3 == b3  = ([], 0)
-        | isPair w3 = let (upper, lower) = splitToWord16 w3
-                      in  (lower : upper : token, tokenLength + 2)
-        | otherwise = (toEnum w3 : token, tokenLength + 1)
-  let (newW6, newRemain)
-        | T.length remain > 0 = (ord $ T.head remain, T.tail remain)
-        | w6 == e1            = (e1, T.empty)
-        | otherwise           = (e2, T.empty)
-  put $ s { remain      = newRemain
-          , token       = newToken
-          , tokenLength = newTokenLength
-          , score       = bias
-          , w1          = w2
-          , w2          = w3
-          , w3          = w4
-          , w4          = w5
-          , w5          = w6
-          , w6          = newW6
-          , c1          = c2
-          , c2          = c3
-          , c3          = c4
-          , c4          = c5
-          , c5          = c6
-          , c6          = getCTypes newW6
-          }
+  when (w4 < e1) $ do
+    let (newW6, newRemain)
+          | T.length remain > 0 = (ord $ T.head remain, T.tail remain)
+          | w6 == e1            = (e2, T.empty)
+          | w6 == e2            = (e3, T.empty)
+          | otherwise           = (e1, T.empty)
+    put $ s { remain = newRemain
+            , score  = bias
+            , w1     = w2
+            , w2     = w3
+            , w3     = w4
+            , w4     = w5
+            , w5     = w6
+            , w6     = newW6
+            , c1     = c2
+            , c2     = c3
+            , c3     = c4
+            , c4     = c5
+            , c5     = c6
+            , c6     = getCTypes newW6
+            }
 {-# INLINABLE moveNext #-}
 
 updateScore :: State TokenizeState ()
 updateScore = do
+  modify $ \s -> update s $ up1 (p1 s)
+  modify $ \s -> update s $ up2 (p2 s)
+  modify $ \s -> update s $ up3 (p3 s)
   modify $ \s -> update s $ bp1 (p1 s, p2 s)
   modify $ \s -> update s $ bp2 (p2 s, p3 s)
   modify $ \s -> update s $ uw1 (w1 s)
@@ -168,47 +173,66 @@ updateScore = do
   modify $ \s -> update s $ tq2 (p2 s, c2 s, c3 s, c4 s)
   modify $ \s -> update s $ tq3 (p3 s, c1 s, c2 s, c3 s)
   modify $ \s -> update s $ tq4 (p3 s, c2 s, c3 s, c4 s)
-  where
-    update :: TokenizeState -> Int -> TokenizeState
-    update s i = s { score = i }
-    {-# INLINE update #-}
+ where
+  update :: TokenizeState -> Int -> TokenizeState
+  update s i = s { score = score s + i }
+  {-# INLINE update #-}
 {-# INLINABLE updateScore #-}
 
-evalScore :: State TokenizeState (Maybe T.Text)
+evalScore :: State TokenizeState ()
 evalScore = do
   s@TS {..} <- get
-  if score > 0 then do
-    let word = tokenToText token tokenLength
-    put $ s { token = []
-            , tokenLength = 0
-            , p1 = p2
-            , p2 = p3
-            , p3 = b
-            }
-    return $ Just word
-  else do
-    put $ s { p1 = p2
-            , p2 = p3
-            , p3 = o
-            }
-    return Nothing
+  if score > 0
+    then do
+      let word = tokenToText token tokenLength
+      put $ s { results     = word : results
+              , token       = []
+              , tokenLength = 0
+              , p1          = p2
+              , p2          = p3
+              , p3          = b
+              }
+    else put $ s { p1 = p2, p2 = p3, p3 = o }
 {-# INLINABLE evalScore #-}
 
-tokenizeM :: State TokenizeState (Maybe T.Text)
+pushToToken :: State TokenizeState ()
+pushToToken = do
+  s@TS {..} <- get
+  when (w3 < e1) $ do
+    let (newToken, newTokenLength)
+          | isPair w3
+          = let (upper, lower) = splitToWord16 w3
+            in  (lower : upper : token, tokenLength + 2)
+          | otherwise
+          = (toEnum w3 : token, tokenLength + 1)
+    put $ s { token = newToken, tokenLength = newTokenLength }
+{-# INLINABLE pushToToken #-}
+
+isFinished :: State TokenizeState Bool
+isFinished = (e1 ==) <$> gets w4
+{-# INLINABLE isFinished #-}
+
+tailToResult :: State TokenizeState ()
+tailToResult = do
+  s@TS {..} <- get
+  let word = tokenToText token tokenLength
+  put $ s { results = word : results, token = [], tokenLength = 0 }
+{-# INLINABLE tailToResult #-}
+
+tokenizeM :: State TokenizeState [T.Text]
 tokenizeM = do
   moveNext
+  pushToToken
   updateScore
   evalScore
+  flag <- isFinished
+  if not flag
+    then tokenizeM
+    else do
+      tailToResult
+      L.reverse <$> gets results
 {-# INLINABLE tokenizeM #-}
 
 tokenize :: T.Text -> [T.Text]
-tokenize text =
-  let func = runState tokenizeM
-      func' s = case func s of
-        (Just t , s') -> Just (t, s')
-        (Nothing, s') -> if token s' /= []
-          then Just (tokenToText (token s') (tokenLength s'), s' { token = [] })
-          else Nothing
-      s = initialState text
-  in  L.unfoldr func' s
+tokenize text = evalState tokenizeM $ initialState text
 {-# INLINABLE tokenize #-}
