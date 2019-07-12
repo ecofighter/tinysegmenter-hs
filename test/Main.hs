@@ -13,8 +13,7 @@ main = do
   putStrLn "Start"
   args <- getArgs
   file <- if not (null args) then T.readFile (head args) else T.getContents
-  let strict = tokenize file
-  let lazy = tok file
-  mapM_ T.putStrLn lazy
+  let res = tokenize file
+  mapM_ print $ fmap T.unpack res
   putStrLn "End"
   exitSuccess

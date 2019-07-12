@@ -1,7 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Text.TinySegmenter
   ( tokenize
-  , tok
   )
 where
 
@@ -16,8 +15,6 @@ import qualified Data.Text.Array               as A
 import qualified Data.Text.Internal            as TI
 import           Data.Word
 import           Text.TinySegmenter.Score
-
-import qualified Data.Text.IO                  as T
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of
@@ -56,7 +53,6 @@ tokenToText xs size = TI.text array 0 size
 {-# INLINABLE tokenToText #-}
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
-                        , results :: ![T.Text]
                         , token :: ![Word16]
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
@@ -82,7 +78,6 @@ initialState :: T.Text -> TokenizeState
 initialState text =
   let (a, b, c, rmn) = takeThree text
   in  TS { remain      = rmn
-         , results     = []
          , token       = []
          , tokenLength = 0
          , score       = bias
@@ -197,11 +192,15 @@ isFinished :: State TokenizeState Bool
 isFinished = (e1 ==) <$> gets w4
 {-# INLINABLE isFinished #-}
 
-tailToResult :: State TokenizeState ()
+tailToResult :: State TokenizeState (Maybe T.Text)
 tailToResult = do
   s@TS {..} <- get
-  let word = tokenToText token tokenLength
-  put $ s { results = word : results, token = [], tokenLength = 0 }
+  if tokenLength > 0
+    then do
+      let word = tokenToText token tokenLength
+      put $ s { remain = T.empty, token = [], tokenLength = 0 }
+      return $ Just word
+    else return Nothing
 {-# INLINABLE tailToResult #-}
 
 evalScore :: State TokenizeState (Maybe T.Text)
@@ -210,55 +209,33 @@ evalScore = do
   if score > 0
     then do
       let word = tokenToText token tokenLength
-      put $ s { results     = word : results
-              , token       = []
-              , tokenLength = 0
-              , p1          = p2
-              , p2          = p3
-              , p3          = b
-              }
+      put $ s { token = [], tokenLength = 0, p1 = p2, p2 = p3, p3 = b }
       return $ Just word
     else do
       put $ s { p1 = p2, p2 = p3, p3 = o }
       return Nothing
 {-# INLINABLE evalScore #-}
 
-tokenizeM :: State TokenizeState [T.Text]
+tokenizeM :: State TokenizeState (Maybe T.Text, Bool)
 tokenizeM = do
-  moveNext
-  pushToToken
-  updateScore
-  evalScore
   flag <- isFinished
-  if not flag
-    then tokenizeM
+  if flag
+    then do
+      word <- tailToResult
+      return (word, True)
     else do
-      tailToResult
-      L.reverse <$> gets results
+      moveNext
+      pushToToken
+      updateScore
+      word <- evalScore
+      return (word, False)
 {-# INLINABLE tokenizeM #-}
 
 tokenize :: T.Text -> [T.Text]
-tokenize text = evalState tokenizeM $ initialState text
-{-# INLINABLE tokenize #-}
-
-tokM :: State TokenizeState (Maybe T.Text, Bool)
-tokM = do
-  moveNext
-  pushToToken
-  updateScore
-  word <- evalScore
-  flag <- isFinished
-  return (word, flag)
-
-tok :: T.Text -> [T.Text]
-tok text =
-  let f = runState tokM
+tokenize text =
+  let f = runState tokenizeM
       g x = case f x of
-        ((Just t, _), s) -> Just (t, s)
-        ((Nothing, isFinished), s) ->
-          if isFinished then
-            Nothing
-          else
-            g s
-      s = initialState text
-  in L.unfoldr g s
+        ((Just t , _         ), s) -> Just (t, s)
+        ((Nothing, isFinished), s) -> if isFinished then Nothing else g s
+  in  L.unfoldr g $ initialState text
+{-# INLINABLE tokenize #-}
