@@ -19,12 +19,10 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:     Text.TinySegmenter
-  other-modules:       Text.Score
+  other-modules:       Text.TinySegmenter.Score
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13
                      , transformers
                      , text
-                     , containers
-                     , unordered-containers
   hs-source-dirs:      src
   default-language:    Haskell2010
