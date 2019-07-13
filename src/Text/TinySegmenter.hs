@@ -24,6 +24,7 @@ import qualified Data.Vector                   as V
 import qualified Data.Vector.Mutable           as MV
 import           Data.Word
 import           Text.TinySegmenter.Score
+import GHC.Exts
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of
@@ -240,10 +241,10 @@ evalScore = do
 
 evalOneStep :: Monad m => StateT TokenizeState m (Maybe T.Text)
 evalOneStep = do
-      moveNext
-      pushToToken
-      updateScore
-      evalScore
+  moveNext
+  pushToToken
+  updateScore
+  evalScore
 {-# INLINE evalOneStep #-}
 
 tokenizeM :: StateT TokenizeState Identity (Maybe T.Text, Bool)
@@ -303,6 +304,6 @@ tokenizeToVec :: T.Text -> V.Vector T.Text
 tokenizeToVec text = v
   where
     v = runST $ do
-          (vec, len) <- evalStateT tokenizeToVecM $ initialState text
+          (vec, len) <- oneShot (evalStateT tokenizeToVecM) $ initialState text
           V.freeze $ MV.unsafeSlice 0 len vec
 {-# INLINE tokenizeToVec #-}
