@@ -1,18 +1,27 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE Strict #-}
+{-# LANGUAGE StrictData #-}
 module Text.TinySegmenter
   ( tokenize
+  , tokenize'
+  , tokenizeToVec
   )
 where
 
+import           Control.DeepSeq
 import           Control.Monad
 import           Control.Monad.ST
+import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State.Strict
 import           Data.Bits
 import           Data.Char
+import           Data.Functor.Identity
 import qualified Data.List                     as L
 import qualified Data.Text                     as T
 import qualified Data.Text.Array               as A
 import qualified Data.Text.Internal            as TI
+import qualified Data.Vector                   as V
+import qualified Data.Vector.Mutable           as MV
 import           Data.Word
 import           Text.TinySegmenter.Score
 
@@ -35,25 +44,38 @@ type Lower = Word16
 splitToWord16 :: Int -> (Upper, Lower)
 splitToWord16 c = (upper, lower)
  where
-  m     = c - 0x10000
-  upper = fromIntegral (shiftR m 10 + 0xD800)
-  lower = fromIntegral ((m .&. 0x3FF) + 0xDC00)
+  v     = c - 0x10000
+  upper = fromIntegral (shiftR v 10 + 0xD800)
+  lower = fromIntegral ((v .&. 0x3FF) + 0xDC00)
 {-# INLINE splitToWord16 #-}
 
-tokenToText :: [Word16] -> Int -> T.Text
+data Word16List = WLCons {-# UNPACK #-} !Word16 !Word16List
+                | WLNil
+
+infixr 8 !:
+(!:) :: Word16 -> Word16List -> Word16List
+(!:) = WLCons
+{-# INLINE (!:) #-}
+
+wlToList :: Word16List -> [Word16]
+wlToList WLNil = []
+wlToList (WLCons s sl) = s : wlToList sl
+{-# INLINE wlToList #-}
+
+tokenToText :: Word16List -> Int -> T.Text
 tokenToText xs size = TI.text array 0 size
  where
   array = runST $ do
-    let idxList =
-          let f x = if x < 0 then [] else x : f (pred x)
-          in  zip xs $ f (pred size)
     arr <- A.new size
-    forM_ idxList (\(c, i) -> A.unsafeWrite arr i c)
+    let ~idxList =
+          let f x = if x < 0 then [] else x : f (pred x)
+          in  zip (wlToList xs) $ f (pred size)
+    forM_ idxList (\(c, idx) -> A.unsafeWrite arr idx c)
     A.unsafeFreeze arr
-{-# INLINABLE tokenToText #-}
+{-# INLINE tokenToText #-}
 
 data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
-                        , token :: ![Word16]
+                        , token :: !Word16List
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
                         , p1 :: {-# UNPACK #-} !Word8
@@ -72,13 +94,12 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , c5 :: {-# UNPACK #-} !Word8
                         , c6 :: {-# UNPACK #-} !Word8
                         }
-                     deriving (Show)
 
 initialState :: T.Text -> TokenizeState
 initialState text =
-  let (a, b, c, rmn) = takeThree text
+  let (one, two, three, rmn) = takeThree text
   in  TS { remain      = rmn
-         , token       = []
+         , token       = WLNil
          , tokenLength = 0
          , score       = bias
          , p1          = u
@@ -87,19 +108,19 @@ initialState text =
          , w1          = b1
          , w2          = b2
          , w3          = b3
-         , w4          = a
-         , w5          = b
-         , w6          = c
+         , w4          = one
+         , w5          = two
+         , w6          = three
          , c1          = o
          , c2          = o
          , c3          = o
-         , c4          = getCTypes a
-         , c5          = getCTypes b
-         , c6          = getCTypes c
+         , c4          = getCTypes one
+         , c5          = getCTypes two
+         , c6          = getCTypes three
          }
-{-# INLINABLE initialState #-}
+{-# INLINE initialState #-}
 
-moveNext :: State TokenizeState ()
+moveNext :: Monad m => StateT TokenizeState m ()
 moveNext = do
   s@TS {..} <- get
   when (w4 < e1) $ do
@@ -123,9 +144,9 @@ moveNext = do
             , c5     = c6
             , c6     = getCTypes newW6
             }
-{-# INLINABLE moveNext #-}
+{-# INLINE moveNext #-}
 
-updateScore :: State TokenizeState ()
+updateScore :: Monad m => StateT TokenizeState m ()
 updateScore = do
   modify $ \s -> update s $ up1 (p1 s)
   modify $ \s -> update s $ up2 (p2 s)
@@ -171,52 +192,60 @@ updateScore = do
   modify $ \s -> update s $ tq4 (p3 s, c2 s, c3 s, c4 s)
  where
   update :: TokenizeState -> Int -> TokenizeState
-  update s i = s { score = score s + i }
+  update s num = s { score = score s + num }
   {-# INLINE update #-}
-{-# INLINABLE updateScore #-}
+{-# INLINE updateScore #-}
 
-pushToToken :: State TokenizeState ()
+pushToToken :: Monad m => StateT TokenizeState m ()
 pushToToken = do
   s@TS {..} <- get
   when (w3 < e1) $ do
     let (newToken, newTokenLength)
           | isPair w3
           = let (upper, lower) = splitToWord16 w3
-            in  (lower : upper : token, tokenLength + 2)
+            in  (lower !: upper !: token, tokenLength + 2)
           | otherwise
-          = (toEnum w3 : token, tokenLength + 1)
+          = (toEnum w3 !: token, tokenLength + 1)
     put $ s { token = newToken, tokenLength = newTokenLength }
-{-# INLINABLE pushToToken #-}
+{-# INLINE pushToToken #-}
 
-isFinished :: State TokenizeState Bool
+isFinished :: Monad m => StateT TokenizeState m Bool
 isFinished = (e1 ==) <$> gets w4
 {-# INLINABLE isFinished #-}
 
-tailToResult :: State TokenizeState (Maybe T.Text)
+tailToResult :: Monad m => StateT TokenizeState m (Maybe T.Text)
 tailToResult = do
   s@TS {..} <- get
   if tokenLength > 0
     then do
       let word = tokenToText token tokenLength
-      put $ s { remain = T.empty, token = [], tokenLength = 0 }
+      put $ s { remain = T.empty, token = WLNil, tokenLength = 0 }
       return $ Just word
     else return Nothing
-{-# INLINABLE tailToResult #-}
+{-# INLINE tailToResult #-}
 
-evalScore :: State TokenizeState (Maybe T.Text)
+evalScore :: Monad m => StateT TokenizeState m (Maybe T.Text)
 evalScore = do
   s@TS {..} <- get
   if score > 0
     then do
       let word = tokenToText token tokenLength
-      put $ s { token = [], tokenLength = 0, p1 = p2, p2 = p3, p3 = b }
+      put $ s { token = WLNil, tokenLength = 0, p1 = p2, p2 = p3, p3 = b }
       return $ Just word
     else do
       put $ s { p1 = p2, p2 = p3, p3 = o }
       return Nothing
-{-# INLINABLE evalScore #-}
+{-# INLINE evalScore #-}
 
-tokenizeM :: State TokenizeState (Maybe T.Text, Bool)
+evalOneStep :: Monad m => StateT TokenizeState m (Maybe T.Text)
+evalOneStep = do
+      moveNext
+      pushToToken
+      updateScore
+      evalScore
+{-# INLINE evalOneStep #-}
+
+tokenizeM :: StateT TokenizeState Identity (Maybe T.Text, Bool)
 tokenizeM = do
   flag <- isFinished
   if flag
@@ -224,18 +253,55 @@ tokenizeM = do
       word <- tailToResult
       return (word, True)
     else do
-      moveNext
-      pushToToken
-      updateScore
-      word <- evalScore
+      word <- evalOneStep
       return (word, False)
-{-# INLINABLE tokenizeM #-}
+{-# INLINE tokenizeM #-}
 
 tokenize :: T.Text -> [T.Text]
 tokenize text =
   let f = runState tokenizeM
       g x = case f x of
-        ((Just t , _         ), s) -> Just (t, s)
-        ((Nothing, isFinished), s) -> if isFinished then Nothing else g s
+        ((Just t , _   ), s) -> Just (t, s)
+        ((Nothing, flag), s) -> if flag then Nothing else g s
   in  L.unfoldr g $ initialState text
-{-# INLINABLE tokenize #-}
+{-# INLINE tokenize #-}
+
+tokenize' :: T.Text -> [T.Text]
+tokenize' text =
+  let ls = tokenize text
+  in  ls `deepseq` ls
+{-# INLINE tokenize' #-}
+
+tokenizeToVecM :: StateT TokenizeState (ST s) (MV.MVector s T.Text, Int)
+tokenizeToVecM = do
+  len <- T.length <$> gets remain
+  vec <- lift $ MV.unsafeNew len
+  body (vec, 0)
+  where
+    body (vec, idx) = do
+      flag <- isFinished
+      if flag then do
+        word <- tailToResult
+        case word of
+          Just w -> do
+            lift $ MV.unsafeWrite vec idx w
+            return (vec, idx+1)
+          Nothing ->
+            return (vec, idx)
+      else do
+        word <- evalOneStep
+        case word of
+          Just w -> do
+            lift $ MV.unsafeWrite vec idx w
+            body (vec, idx+1)
+          Nothing ->
+            body (vec, idx)
+{-# INLINE tokenizeToVecM #-}
+
+tokenizeToVec :: T.Text -> V.Vector T.Text
+tokenizeToVec text = v
+  where
+    v = runST $ do
+          (vec, len) <- evalStateT tokenizeToVecM $ initialState text
+          V.freeze $ MV.unsafeSlice 0 len vec
+{-# INLINE tokenizeToVec #-}
