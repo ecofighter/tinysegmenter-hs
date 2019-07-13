@@ -59,7 +59,8 @@ infixr 8 !:
 
 wlToList :: Word16List -> [Word16]
 wlToList WLNil = []
-wlToList (WLCons s sl) = s : wlToList sl
+wlToList (WLCons s sl) = let ~delayed = wlToList sl
+                         in s : delayed
 {-# INLINE wlToList #-}
 
 tokenToText :: Word16List -> Int -> T.Text
@@ -69,7 +70,7 @@ tokenToText xs size = TI.text array 0 size
     arr <- A.new size
     let ~idxList =
           let f x = if x < 0 then [] else x : f (pred x)
-          in  zip (wlToList xs) $ f (pred size)
+          in  L.zip (wlToList xs) $ f (pred size)
     forM_ idxList (\(c, idx) -> A.unsafeWrite arr idx c)
     A.unsafeFreeze arr
 {-# INLINE tokenToText #-}
