@@ -2,7 +2,6 @@
 #ifndef INCLUDE_MODEL
 module Text.TinySegmenter.Score ( bias, b1, b2, b3, e1, e2, e3
                                 , Marker(..), CType(..)
-                                , h, i, k, o, a, n, m, mo, mb, mu
                                 , getCTypes
                                 , up1, up2, up3
                                 , bp1, bp2, uw1, uw2, uw3, uw4, uw5, uw6
@@ -15,6 +14,7 @@ module Text.TinySegmenter.Score ( bias, b1, b2, b3, e1, e2, e3
 
 import           Data.Char
 #endif
+
 -- bias
 bias :: Int
 bias = -332
@@ -28,59 +28,35 @@ e1 = 0x110004
 e2 = 0x110005
 e3 = 0x110006
 
+data CType = CTH | CTI | CTK |CTO | CTA | CTN | CTM
+
+data Marker = MO | MB | MU
+
 getCTypes :: Int -> CType
 getCTypes c
   | c `elem` ml
-  = m
+  = CTM
   | (ord '一' <= c && c <= ord '龠') || c `elem` hl
-  = h
+  = CTH
   | ord 'ぁ' <= c && c <= ord 'ん'
-  = i
+  = CTI
   | (ord 'ァ' <= c && c <= ord 'ヴ')
     || (ord 'ｱ' <= c && c <= ord 'ﾝ') || c `elem` ksubl
-  = k
+  = CTK
   | (ord 'a' <= c && c <= ord 'z')
     || (ord 'A' <= c && c <= ord 'Z')
     || (ord 'ａ' <= c && c <= ord 'ｚ')
     || (ord 'Ａ' <= c && c <= ord 'Ｚ')
-  = a
+  = CTA
   | (ord '0' <= c && c <= ord '9') || (ord '０' <= c && c <= ord '９')
-  = n
+  = CTN
   | otherwise
-  = o
+  = CTO
   where
     ml    = fmap ord ("一二三四五六七八九十百千万億兆" :: String)
     hl    = fmap ord ("々〆ヵヶ" :: String)
     ksubl = fmap ord ("ーｰ\xff9e" :: String)
 {-# INLINE getCTypes #-}
-
-data CType = CTH | CTI | CTK |CTO | CTA | CTN | CTM
-
-h, i, k, o, a, n, m :: CType
-h = CTH
-i = CTI
-k = CTK
-o = CTO
-a = CTA
-n = CTN
-m = CTM
-{-# INLINE h #-}
-{-# INLINE i #-}
-{-# INLINE k #-}
-{-# INLINE o #-}
-{-# INLINE a #-}
-{-# INLINE n #-}
-{-# INLINE m #-}
-
-data Marker = MO | MB | MU
-
-mo, mb, mu :: Marker
-mo = MO
-mb = MB
-mu = MU
-{-# INLINE mo #-}
-{-# INLINE mb #-}
-{-# INLINE mu #-}
 
 bc1 :: (CType, CType) -> Int
 bc1 (CTH, CTH) = 6

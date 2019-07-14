@@ -34,7 +34,7 @@ benchmark bench
   hs-source-dirs:      bench
   main-is:             Main.hs
   type:                exitcode-stdio-1.0
-  ghc-options:         -threaded -O2
+  ghc-options:         -threaded
   build-depends:       base >=4.12 && <4.13
                      , text
                      , tinysegmenter

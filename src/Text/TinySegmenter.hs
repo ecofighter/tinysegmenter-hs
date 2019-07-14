@@ -82,21 +82,21 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , token :: !Word16List
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
-                        , p1 :: {-# UNPACK #-} !Marker
-                        , p2 :: {-# UNPACK #-} !Marker
-                        , p3 :: {-# UNPACK #-} !Marker
+                        , p1 :: !Marker
+                        , p2 :: !Marker
+                        , p3 :: !Marker
                         , w1 :: {-# UNPACK #-} !Int
                         , w2 :: {-# UNPACK #-} !Int
                         , w3 :: {-# UNPACK #-} !Int
                         , w4 :: {-# UNPACK #-} !Int
                         , w5 :: {-# UNPACK #-} !Int
                         , w6 :: {-# UNPACK #-} !Int
-                        , c1 :: {-# UNPACK #-} !CType
-                        , c2 :: {-# UNPACK #-} !CType
-                        , c3 :: {-# UNPACK #-} !CType
-                        , c4 :: {-# UNPACK #-} !CType
-                        , c5 :: {-# UNPACK #-} !CType
-                        , c6 :: {-# UNPACK #-} !CType
+                        , c1 :: !CType
+                        , c2 :: !CType
+                        , c3 :: !CType
+                        , c4 :: !CType
+                        , c5 :: !CType
+                        , c6 :: !CType
                         }
 
 initialState :: T.Text -> TokenizeState
@@ -115,9 +115,9 @@ initialState text =
          , w4          = one
          , w5          = two
          , w6          = three
-         , c1          = o
-         , c2          = o
-         , c3          = o
+         , c1          = CTO
+         , c2          = CTO
+         , c3          = CTO
          , c4          = getCTypes one
          , c5          = getCTypes two
          , c6          = getCTypes three
