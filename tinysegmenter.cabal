@@ -16,8 +16,10 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:     Text.TinySegmenter
-  other-modules:       Text.TinySegmenter.Score
+  -- other-modules:       Text.TinySegmenter.Score
   other-extensions:    RecordWildCards
+                       BangPatterns
+                       CPP
   ghc-options:         -Wall
   build-depends:       base >=4.12 && <4.13
                      , transformers
@@ -31,7 +33,7 @@ benchmark bench
   hs-source-dirs:      bench
   main-is:             Main.hs
   type:                exitcode-stdio-1.0
-  ghc-options:         -O2
+  ghc-options:         -threaded
   build-depends:       base >=4.12 && <4.13
                      , text
                      , tinysegmenter

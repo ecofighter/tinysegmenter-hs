@@ -1,6 +1,6 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE Strict #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE BangPatterns #-}
 module Text.TinySegmenter
   ( tokenize
   , tokenize'
@@ -23,8 +23,9 @@ import qualified Data.Text.Internal            as TI
 import qualified Data.Vector                   as V
 import qualified Data.Vector.Mutable           as MV
 import           Data.Word
-import           Text.TinySegmenter.Score
-import GHC.Exts
+
+#define INCLUDE_MODEL
+#include "TinySegmenter/Model.hs"
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of
@@ -60,7 +61,7 @@ infixr 8 !:
 
 wlToList :: Word16List -> [Word16]
 wlToList WLNil = []
-wlToList (WLCons s sl) = let ~delayed = wlToList sl
+wlToList (WLCons s sl) = let delayed = wlToList sl
                          in s : delayed
 {-# INLINE wlToList #-}
 
@@ -69,7 +70,7 @@ tokenToText xs size = TI.text array 0 size
  where
   array = runST $ do
     arr <- A.new size
-    let ~idxList =
+    let idxList =
           let f x = if x < 0 then [] else x : f (pred x)
           in  L.zip (wlToList xs) $ f (pred size)
     forM_ idxList (\(c, idx) -> A.unsafeWrite arr idx c)
@@ -80,21 +81,21 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , token :: !Word16List
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
-                        , p1 :: {-# UNPACK #-} !Word8
-                        , p2 :: {-# UNPACK #-} !Word8
-                        , p3 :: {-# UNPACK #-} !Word8
+                        , p1 :: !Marker
+                        , p2 :: !Marker
+                        , p3 :: !Marker
                         , w1 :: {-# UNPACK #-} !Int
                         , w2 :: {-# UNPACK #-} !Int
                         , w3 :: {-# UNPACK #-} !Int
                         , w4 :: {-# UNPACK #-} !Int
                         , w5 :: {-# UNPACK #-} !Int
                         , w6 :: {-# UNPACK #-} !Int
-                        , c1 :: {-# UNPACK #-} !Word8
-                        , c2 :: {-# UNPACK #-} !Word8
-                        , c3 :: {-# UNPACK #-} !Word8
-                        , c4 :: {-# UNPACK #-} !Word8
-                        , c5 :: {-# UNPACK #-} !Word8
-                        , c6 :: {-# UNPACK #-} !Word8
+                        , c1 :: !CType
+                        , c2 :: !CType
+                        , c3 :: !CType
+                        , c4 :: !CType
+                        , c5 :: !CType
+                        , c6 :: !CType
                         }
 
 initialState :: T.Text -> TokenizeState
@@ -104,18 +105,18 @@ initialState text =
          , token       = WLNil
          , tokenLength = 0
          , score       = bias
-         , p1          = u
-         , p2          = u
-         , p3          = u
+         , p1          = MU
+         , p2          = MU
+         , p3          = MU
          , w1          = b1
          , w2          = b2
          , w3          = b3
          , w4          = one
          , w5          = two
          , w6          = three
-         , c1          = o
-         , c2          = o
-         , c3          = o
+         , c1          = CTO
+         , c2          = CTO
+         , c3          = CTO
          , c4          = getCTypes one
          , c5          = getCTypes two
          , c6          = getCTypes three
@@ -213,7 +214,7 @@ pushToToken = do
 
 isFinished :: Monad m => StateT TokenizeState m Bool
 isFinished = (e1 ==) <$> gets w4
-{-# INLINABLE isFinished #-}
+{-# INLINE isFinished #-}
 
 tailToResult :: Monad m => StateT TokenizeState m (Maybe T.Text)
 tailToResult = do
@@ -232,10 +233,10 @@ evalScore = do
   if score > 0
     then do
       let word = tokenToText token tokenLength
-      put $ s { token = WLNil, tokenLength = 0, p1 = p2, p2 = p3, p3 = b }
+      put $ s { token = WLNil, tokenLength = 0, p1 = p2, p2 = p3, p3 = MB }
       return $ Just word
     else do
-      put $ s { p1 = p2, p2 = p3, p3 = o }
+      put $ s { p1 = p2, p2 = p3, p3 = MO }
       return Nothing
 {-# INLINE evalScore #-}
 
@@ -280,7 +281,7 @@ tokenizeToVecM = do
   vec <- lift $ MV.unsafeNew len
   body (vec, 0)
   where
-    body (vec, idx) = do
+    body (!vec, !idx) = do
       flag <- isFinished
       if flag then do
         word <- tailToResult
@@ -304,6 +305,6 @@ tokenizeToVec :: T.Text -> V.Vector T.Text
 tokenizeToVec text = v
   where
     v = runST $ do
-          (vec, len) <- oneShot (evalStateT tokenizeToVecM) $ initialState text
+          (vec, len) <- evalStateT tokenizeToVecM $ initialState text
           V.freeze $ MV.unsafeSlice 0 len vec
 {-# INLINE tokenizeToVec #-}
