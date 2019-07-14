@@ -15,7 +15,7 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
 library
-  exposed-modules:     Text.TinySegmenter
+  exposed-modules:     Text.TinySegmenter.Text
   -- other-modules:       Text.TinySegmenter.Score
   other-extensions:    RecordWildCards
                        BangPatterns
@@ -24,6 +24,7 @@ library
   build-depends:       base >=4.12 && <4.13
                      , transformers
                      , text == 1.2.*
+                     , bytestring == 0.10.*
                      , vector
                      , deepseq
   hs-source-dirs:      src

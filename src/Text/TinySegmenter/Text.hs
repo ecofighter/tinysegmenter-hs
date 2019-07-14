@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
-module Text.TinySegmenter
+module Text.TinySegmenter.Text
   ( tokenize
   , tokenize'
   , tokenizeToVec
@@ -25,7 +25,7 @@ import qualified Data.Vector.Mutable           as MV
 import           Data.Word
 
 #define INCLUDE_MODEL
-#include "TinySegmenter/Model.hs"
+#include "Model.hs"
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of
