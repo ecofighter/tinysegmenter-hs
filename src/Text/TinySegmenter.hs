@@ -26,7 +26,7 @@ import qualified Data.Vector.Mutable           as MV
 import           Data.Word
 
 #define INCLUDE_MODEL
-#include "TinySegmenter/Score.hs"
+#include "TinySegmenter/Model.hs"
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of

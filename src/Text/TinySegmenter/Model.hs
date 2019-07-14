@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 #ifndef INCLUDE_MODEL
-module Text.TinySegmenter.Score ( bias, b1, b2, b3, e1, e2, e3
+module Text.TinySegmenter.Model ( bias, b1, b2, b3, e1, e2, e3
                                 , Marker(..), CType(..)
                                 , getCTypes
                                 , up1, up2, up3
