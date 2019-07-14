@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
-module Text.TinySegmenter.ByteString
+module Text.TinySegmenter.ByteString.Lazy
   ( tokenize
   , tokenizeToVec
   )
@@ -14,18 +14,17 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State.Strict
 import           Data.Char
 import           Data.Functor.Identity
-import qualified Data.ByteString               as BS
-import qualified Data.ByteString.Builder       as BS
+import qualified Data.ByteString.Builder       as BSB
 import qualified Data.ByteString.Lazy          as BSL
-import qualified Data.ByteString.UTF8          as BSU
+import qualified Data.ByteString.Lazy.UTF8     as BSU
 import qualified Data.List                     as L
 import qualified Data.Vector                   as V
 import qualified Data.Vector.Mutable           as MV
 
 #define INCLUDE_MODEL
-#include "Model.hs"
+#include "../Model.hs"
 
-takeThree :: BS.ByteString -> (Int, Int, Int, BS.ByteString)
+takeThree :: BSL.ByteString -> (Int, Int, Int, BSL.ByteString)
 takeThree text = case BSU.uncons text of
   Nothing       -> (e1, e2, e3, text)
   Just (ca, ra) -> case BSU.uncons ra of
@@ -35,12 +34,12 @@ takeThree text = case BSU.uncons text of
       Just (cc, rc) -> (ord ca, ord cb, ord cc, rc)
 {-# INLINE takeThree #-}
 
-tokenToText :: BS.Builder -> BSL.ByteString
-tokenToText = BS.toLazyByteString
+tokenToText :: BSB.Builder -> BSL.ByteString
+tokenToText = BSB.toLazyByteString
 {-# INLINE tokenToText #-}
 
-data TokenizeState = TS { remain :: {-# UNPACK #-} !BS.ByteString
-                        , token :: !BS.Builder
+data TokenizeState = TS { remain :: !BSL.ByteString
+                        , token :: !BSB.Builder
                         , score :: {-# UNPACK #-} !Int
                         , p1 :: !Marker
                         , p2 :: !Marker
@@ -59,11 +58,11 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !BS.ByteString
                         , c6 :: !CType
                         }
 
-initialState :: BS.ByteString -> TokenizeState
+initialState :: BSL.ByteString -> TokenizeState
 initialState text =
   let (one, two, three, rmn) = takeThree text
   in  TS { remain      = rmn
-         , token       = BS.byteString BS.empty
+         , token       = BSB.lazyByteString BSL.empty
          , score       = bias
          , p1          = MU
          , p2          = MU
@@ -89,9 +88,9 @@ moveNext = do
   when (w4 < e1) $ do
     let (newW6, newRemain) = case BSU.uncons remain of
               Just (c, r) -> (ord c, r)
-              Nothing -> if | w6 == e1  -> (e2, BS.empty)
-                            | w6 == e2  -> (e3, BS.empty)
-                            | otherwise -> (e1, BS.empty)
+              Nothing -> if | w6 == e1  -> (e2, BSL.empty)
+                            | w6 == e2  -> (e3, BSL.empty)
+                            | otherwise -> (e1, BSL.empty)
     put $ s { remain = newRemain
             , score  = bias
             , w1     = w2
@@ -163,7 +162,7 @@ pushToToken :: Monad m => StateT TokenizeState m ()
 pushToToken = do
   s@TS {..} <- get
   when (w3 < e1) $ do
-    let !newToken = token <> BS.charUtf8 (chr w3)
+    let !newToken = token <> BSB.charUtf8 (chr w3)
     put $ s { token = newToken }
 {-# INLINE pushToToken #-}
 
@@ -177,7 +176,7 @@ tailToResult = do
   let word = tokenToText token
   if BSL.length word > 0
     then do
-      put $ s { remain = BS.empty, token = BS.byteString BS.empty }
+      put $ s { remain = BSL.empty, token = BSB.lazyByteString BSL.empty }
       return $ Just word
   else return Nothing
 {-# INLINE tailToResult #-}
@@ -188,7 +187,7 @@ evalScore = do
   if score > 0
     then do
       let word = tokenToText token
-      put $ s { token = BS.byteString BS.empty , p1 = p2, p2 = p3, p3 = MB }
+      put $ s { token = BSB.lazyByteString BSL.empty , p1 = p2, p2 = p3, p3 = MB }
       return $ Just word
     else do
       put $ s { p1 = p2, p2 = p3, p3 = MO }
@@ -215,7 +214,7 @@ tokenizeM = do
       return (word, False)
 {-# INLINE tokenizeM #-}
 
-tokenize :: BS.ByteString -> [BSL.ByteString]
+tokenize :: BSL.ByteString -> [BSL.ByteString]
 tokenize text =
   let f = runState tokenizeM
       g x = case f x of
@@ -226,8 +225,8 @@ tokenize text =
 
 tokenizeToVecM :: StateT TokenizeState (ST s) (MV.MVector s BSL.ByteString, Int)
 tokenizeToVecM = do
-  len <- BS.length <$> gets remain
-  vec <- lift $ MV.unsafeNew len
+  len <- BSL.length <$> gets remain
+  vec <- lift $ MV.unsafeNew $ fromIntegral len
   body (vec, 0)
   where
     body (!vec, !idx) = do
@@ -250,7 +249,7 @@ tokenizeToVecM = do
             body (vec, idx)
 {-# INLINE tokenizeToVecM #-}
 
-tokenizeToVec :: BS.ByteString -> V.Vector BSL.ByteString
+tokenizeToVec :: BSL.ByteString -> V.Vector BSL.ByteString
 tokenizeToVec text = v
   where
     v = runST $ do

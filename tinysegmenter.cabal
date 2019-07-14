@@ -17,6 +17,7 @@ extra-source-files:  CHANGELOG.md
 library
   exposed-modules:     Text.TinySegmenter.Text
                        Text.TinySegmenter.ByteString
+                       Text.TinySegmenter.ByteString.Lazy
   -- other-modules:       Text.TinySegmenter.Model
   other-extensions:    RecordWildCards
                        BangPatterns
