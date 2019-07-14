@@ -1,7 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
-module Text.TinySegmenter.Text
+{-# LANGUAGE MultiWayIf #-}
+module Text.TinySegmenter.ByteString
   ( tokenize
   , tokenizeToVec
   )
@@ -11,73 +12,35 @@ import           Control.Monad
 import           Control.Monad.ST
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State.Strict
-import           Data.Bits
 import           Data.Char
 import           Data.Functor.Identity
+import qualified Data.ByteString               as BS
+import qualified Data.ByteString.Builder       as BS
+import qualified Data.ByteString.Lazy          as BSL
+import qualified Data.ByteString.UTF8          as BSU
 import qualified Data.List                     as L
-import qualified Data.Text                     as T
-import qualified Data.Text.Array               as A
-import qualified Data.Text.Internal            as TI
 import qualified Data.Vector                   as V
 import qualified Data.Vector.Mutable           as MV
-import           Data.Word
 
 #define INCLUDE_MODEL
 #include "Model.hs"
 
-takeThree :: T.Text -> (Int, Int, Int, T.Text)
-takeThree text = case T.uncons text of
+takeThree :: BS.ByteString -> (Int, Int, Int, BS.ByteString)
+takeThree text = case BSU.uncons text of
   Nothing       -> (e1, e2, e3, text)
-  Just (ca, ra) -> case T.uncons ra of
+  Just (ca, ra) -> case BSU.uncons ra of
     Nothing       -> (ord ca, e1, e2, ra)
-    Just (cb, rb) -> case T.uncons rb of
+    Just (cb, rb) -> case BSU.uncons rb of
       Nothing       -> (ord ca, ord cb, e1, rb)
       Just (cc, rc) -> (ord ca, ord cb, ord cc, rc)
 {-# INLINE takeThree #-}
 
-isPair :: Int -> Bool
-isPair c = c > 0x10000
-{-# INLINE isPair #-}
-
-type Upper = Word16
-type Lower = Word16
-splitToWord16 :: Int -> (Upper, Lower)
-splitToWord16 c = (upper, lower)
- where
-  v     = c - 0x10000
-  upper = fromIntegral (shiftR v 10 + 0xD800)
-  lower = fromIntegral ((v .&. 0x3FF) + 0xDC00)
-{-# INLINE splitToWord16 #-}
-
-data Word16List = WLCons {-# UNPACK #-} !Word16 !Word16List
-                | WLNil
-
-infixr 8 !:
-(!:) :: Word16 -> Word16List -> Word16List
-(!:) = WLCons
-{-# INLINE (!:) #-}
-
-wlToList :: Word16List -> [Word16]
-wlToList WLNil = []
-wlToList (WLCons s sl) = let delayed = wlToList sl
-                         in s : delayed
-{-# INLINE wlToList #-}
-
-tokenToText :: Word16List -> Int -> T.Text
-tokenToText xs size = TI.text array 0 size
- where
-  array = runST $ do
-    arr <- A.new size
-    let idxList =
-          let f x = if x < 0 then [] else x : f (pred x)
-          in  L.zip (wlToList xs) $ f (pred size)
-    forM_ idxList (\(c, idx) -> A.unsafeWrite arr idx c)
-    A.unsafeFreeze arr
+tokenToText :: BS.Builder -> BSL.ByteString
+tokenToText = BS.toLazyByteString
 {-# INLINE tokenToText #-}
 
-data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
-                        , token :: !Word16List
-                        , tokenLength :: {-# UNPACK #-} !Int
+data TokenizeState = TS { remain :: {-# UNPACK #-} !BS.ByteString
+                        , token :: !BS.Builder
                         , score :: {-# UNPACK #-} !Int
                         , p1 :: !Marker
                         , p2 :: !Marker
@@ -96,12 +59,11 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , c6 :: !CType
                         }
 
-initialState :: T.Text -> TokenizeState
+initialState :: BS.ByteString -> TokenizeState
 initialState text =
   let (one, two, three, rmn) = takeThree text
   in  TS { remain      = rmn
-         , token       = WLNil
-         , tokenLength = 0
+         , token       = BS.byteString BS.empty
          , score       = bias
          , p1          = MU
          , p2          = MU
@@ -125,11 +87,11 @@ moveNext :: Monad m => StateT TokenizeState m ()
 moveNext = do
   s@TS {..} <- get
   when (w4 < e1) $ do
-    let (newW6, newRemain)
-          | T.length remain > 0 = (ord $ T.head remain, T.tail remain)
-          | w6 == e1            = (e2, T.empty)
-          | w6 == e2            = (e3, T.empty)
-          | otherwise           = (e1, T.empty)
+    let (newW6, newRemain) = case BSU.uncons remain of
+              Just (c, r) -> (ord c, r)
+              Nothing -> if | w6 == e1  -> (e2, BS.empty)
+                            | w6 == e2  -> (e3, BS.empty)
+                            | otherwise -> (e1, BS.empty)
     put $ s { remain = newRemain
             , score  = bias
             , w1     = w2
@@ -201,44 +163,39 @@ pushToToken :: Monad m => StateT TokenizeState m ()
 pushToToken = do
   s@TS {..} <- get
   when (w3 < e1) $ do
-    let (newToken, newTokenLength)
-          | isPair w3
-          = let (upper, lower) = splitToWord16 w3
-            in  (lower !: upper !: token, tokenLength + 2)
-          | otherwise
-          = (toEnum w3 !: token, tokenLength + 1)
-    put $ s { token = newToken, tokenLength = newTokenLength }
+    let !newToken = token <> BS.charUtf8 (chr w3)
+    put $ s { token = newToken }
 {-# INLINE pushToToken #-}
 
 isFinished :: Monad m => StateT TokenizeState m Bool
 isFinished = (e1 ==) <$> gets w4
 {-# INLINE isFinished #-}
 
-tailToResult :: Monad m => StateT TokenizeState m (Maybe T.Text)
+tailToResult :: Monad m => StateT TokenizeState m (Maybe BSL.ByteString)
 tailToResult = do
   s@TS {..} <- get
-  if tokenLength > 0
+  let word = tokenToText token
+  if BSL.length word > 0
     then do
-      let word = tokenToText token tokenLength
-      put $ s { remain = T.empty, token = WLNil, tokenLength = 0 }
+      put $ s { remain = BS.empty, token = BS.byteString BS.empty }
       return $ Just word
-    else return Nothing
+  else return Nothing
 {-# INLINE tailToResult #-}
 
-evalScore :: Monad m => StateT TokenizeState m (Maybe T.Text)
+evalScore :: Monad m => StateT TokenizeState m (Maybe BSL.ByteString)
 evalScore = do
   s@TS {..} <- get
   if score > 0
     then do
-      let word = tokenToText token tokenLength
-      put $ s { token = WLNil, tokenLength = 0, p1 = p2, p2 = p3, p3 = MB }
+      let word = tokenToText token
+      put $ s { token = BS.byteString BS.empty , p1 = p2, p2 = p3, p3 = MB }
       return $ Just word
     else do
       put $ s { p1 = p2, p2 = p3, p3 = MO }
       return Nothing
 {-# INLINE evalScore #-}
 
-evalOneStep :: Monad m => StateT TokenizeState m (Maybe T.Text)
+evalOneStep :: Monad m => StateT TokenizeState m (Maybe BSL.ByteString)
 evalOneStep = do
   moveNext
   pushToToken
@@ -246,7 +203,7 @@ evalOneStep = do
   evalScore
 {-# INLINE evalOneStep #-}
 
-tokenizeM :: StateT TokenizeState Identity (Maybe T.Text, Bool)
+tokenizeM :: StateT TokenizeState Identity (Maybe BSL.ByteString, Bool)
 tokenizeM = do
   flag <- isFinished
   if flag
@@ -258,7 +215,7 @@ tokenizeM = do
       return (word, False)
 {-# INLINE tokenizeM #-}
 
-tokenize :: T.Text -> [T.Text]
+tokenize :: BS.ByteString -> [BSL.ByteString]
 tokenize text =
   let f = runState tokenizeM
       g x = case f x of
@@ -267,9 +224,9 @@ tokenize text =
   in  L.unfoldr g $ initialState text
 {-# INLINE tokenize #-}
 
-tokenizeToVecM :: StateT TokenizeState (ST s) (MV.MVector s T.Text, Int)
+tokenizeToVecM :: StateT TokenizeState (ST s) (MV.MVector s BSL.ByteString, Int)
 tokenizeToVecM = do
-  len <- T.length <$> gets remain
+  len <- BS.length <$> gets remain
   vec <- lift $ MV.unsafeNew len
   body (vec, 0)
   where
@@ -293,7 +250,7 @@ tokenizeToVecM = do
             body (vec, idx)
 {-# INLINE tokenizeToVecM #-}
 
-tokenizeToVec :: T.Text -> V.Vector T.Text
+tokenizeToVec :: BS.ByteString -> V.Vector BSL.ByteString
 tokenizeToVec text = v
   where
     v = runST $ do
