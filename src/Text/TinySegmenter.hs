@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE Strict #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE BangPatterns #-}
 module Text.TinySegmenter
   ( tokenize
   , tokenize'
@@ -62,7 +61,7 @@ infixr 8 !:
 
 wlToList :: Word16List -> [Word16]
 wlToList WLNil = []
-wlToList (WLCons s sl) = let ~delayed = wlToList sl
+wlToList (WLCons s sl) = let delayed = wlToList sl
                          in s : delayed
 {-# INLINE wlToList #-}
 
@@ -71,7 +70,7 @@ tokenToText xs size = TI.text array 0 size
  where
   array = runST $ do
     arr <- A.new size
-    let ~idxList =
+    let idxList =
           let f x = if x < 0 then [] else x : f (pred x)
           in  L.zip (wlToList xs) $ f (pred size)
     forM_ idxList (\(c, idx) -> A.unsafeWrite arr idx c)
@@ -215,7 +214,7 @@ pushToToken = do
 
 isFinished :: Monad m => StateT TokenizeState m Bool
 isFinished = (e1 ==) <$> gets w4
-{-# INLINABLE isFinished #-}
+{-# INLINE isFinished #-}
 
 tailToResult :: Monad m => StateT TokenizeState m (Maybe T.Text)
 tailToResult = do
@@ -282,7 +281,7 @@ tokenizeToVecM = do
   vec <- lift $ MV.unsafeNew len
   body (vec, 0)
   where
-    body (vec, idx) = do
+    body (!vec, !idx) = do
       flag <- isFinished
       if flag then do
         word <- tailToResult
