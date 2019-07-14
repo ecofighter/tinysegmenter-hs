@@ -1,5 +1,8 @@
+{-# LANGUAGE CPP #-}
+#ifndef INCLUDE_MODEL
 module Text.TinySegmenter.Score ( bias, b1, b2, b3, e1, e2, e3
-                                , h, i, k, o, a, n, m, b, u
+                                , Marker(..), CType(..)
+                                , h, i, k, o, a, n, m, mo, mb, mu
                                 , getCTypes
                                 , up1, up2, up3
                                 , bp1, bp2, uw1, uw2, uw3, uw4, uw5, uw6
@@ -11,8 +14,7 @@ module Text.TinySegmenter.Score ( bias, b1, b2, b3, e1, e2, e3
                                 ) where
 
 import           Data.Char
-import           Data.Word
-
+#endif
 -- bias
 bias :: Int
 bias = -332
@@ -26,7 +28,7 @@ e1 = 0x110004
 e2 = 0x110005
 e3 = 0x110006
 
-getCTypes :: Int -> Word8
+getCTypes :: Int -> CType
 getCTypes c
   | c `elem` ml
   = m
@@ -50,144 +52,159 @@ getCTypes c
     ml    = fmap ord ("一二三四五六七八九十百千万億兆" :: String)
     hl    = fmap ord ("々〆ヵヶ" :: String)
     ksubl = fmap ord ("ーｰ\xff9e" :: String)
-{-# INLINABLE getCTypes #-}
+{-# INLINE getCTypes #-}
 
--- Words
-h, i, k, o, a, n, m, b, u :: Word8
-h = fromIntegral $ ord 'H'
-i = fromIntegral $ ord 'I'
-k = fromIntegral $ ord 'K'
-o = fromIntegral $ ord 'O'
-a = fromIntegral $ ord 'A'
-n = fromIntegral $ ord 'N'
-m = fromIntegral $ ord 'M'
+data CType = CTH | CTI | CTK |CTO | CTA | CTN | CTM
 
-b = fromIntegral $ ord 'B'
-u = fromIntegral $ ord 'U'
+h, i, k, o, a, n, m :: CType
+h = CTH
+i = CTI
+k = CTK
+o = CTO
+a = CTA
+n = CTN
+m = CTM
+{-# INLINE h #-}
+{-# INLINE i #-}
+{-# INLINE k #-}
+{-# INLINE o #-}
+{-# INLINE a #-}
+{-# INLINE n #-}
+{-# INLINE m #-}
 
-bc1 :: (Word8, Word8) -> Int
-bc1 t | t == (h, h) = 6
-      | t == (i, i) = 2461
-      | t == (k, h) = 406
-      | t == (o, h) = -1378
-      | otherwise = 0
+data Marker = MO | MB | MU
+
+mo, mb, mu :: Marker
+mo = MO
+mb = MB
+mu = MU
+{-# INLINE mo #-}
+{-# INLINE mb #-}
+{-# INLINE mu #-}
+
+bc1 :: (CType, CType) -> Int
+bc1 (CTH, CTH) = 6
+bc1 (CTI, CTI) = 2461
+bc1 (CTK, CTH) = 406
+bc1 (CTO, CTH) = -1378
+bc1 _ = 0
 {-# INLINE bc1 #-}
 
-bc2 :: (Word8, Word8) -> Int
-bc2 t | t == (a, a) = -3267
-      | t == (a, i) = 2744
-      | t == (a, n) = -878
-      | t == (h, h) = -4070
-      | t == (h, m) = -1711
-      | t == (h, n) = 4012
-      | t == (h, o) = 3761
-      | t == (i, a) = 1327
-      | t == (i, h) = -1184
-      | t == (i, i) = -1332
-      | t == (i, k) = 1721
-      | t == (i, o) = 5492
-      | t == (k, i) = 3831
-      | t == (k, k) = -8741
-      | t == (m, h) = -3132
-      | t == (m, k) = 3334
-      | t == (o, o) = -2920
-      | otherwise = 0
+bc2 :: (CType, CType) -> Int
+bc2 (CTA, CTA) = -3267
+bc2 (CTA, CTI) = 2744
+bc2 (CTA, CTN) = -878
+bc2 (CTH, CTH) = -4070
+bc2 (CTH, CTM) = -1711
+bc2 (CTH, CTN) = 4012
+bc2 (CTH, CTO) = 3761
+bc2 (CTI, CTA) = 1327
+bc2 (CTI, CTH) = -1184
+bc2 (CTI, CTI) = -1332
+bc2 (CTI, CTK) = 1721
+bc2 (CTI, CTO) = 5492
+bc2 (CTK, CTI) = 3831
+bc2 (CTK, CTK) = -8741
+bc2 (CTM, CTH) = -3132
+bc2 (CTM, CTK) = 3334
+bc2 (CTO, CTO) = -2920
+bc2 _ = 0
 {-# INLINE bc2 #-}
 
-bc3 :: (Word8, Word8) -> Int
-bc3 t | t == (h, h) = 996
-      | t == (h, i) = 626
-      | t == (h, k) = -721
-      | t == (h, n) = -1307
-      | t == (h, o) = -836
-      | t == (i, h) = -301
-      | t == (k, k) = 2762
-      | t == (m, k) = 1079
-      | t == (m, m) = 4034
-      | t == (o, a) = -1652
-      | t == (o, h) = 266
-      | otherwise = 0
+bc3 :: (CType, CType) -> Int
+bc3 (CTH, CTH) = 996
+bc3 (CTH, CTI) = 626
+bc3 (CTH, CTK) = -721
+bc3 (CTH, CTN) = -1307
+bc3 (CTH, CTO) = -836
+bc3 (CTI, CTH) = -301
+bc3 (CTK, CTK) = 2762
+bc3 (CTM, CTK) = 1079
+bc3 (CTM, CTM) = 4034
+bc3 (CTO, CTA) = -1652
+bc3 (CTO, CTH) = 266
+bc3 _ = 0
 {-# INLINE bc3 #-}
 
-bp1 :: (Word8, Word8) -> Int
-bp1 t | t == (b, b) = 295
-      | t == (o, b) = 304
-      | t == (o, o) = -125
-      | t == (u, b) = 352
-      | otherwise = 0
+bp1 :: (Marker, Marker) -> Int
+bp1 (MB, MB) = 295
+bp1 (MO, MB) = 304
+bp1 (MO, MO) = -125
+bp1 (MU, MB) = 352
+bp1 _ = 0
 {-# INLINE bp1 #-}
 
-bp2 :: (Word8, Word8) -> Int
-bp2 t | t == (b, o) = 60
-      | t == (o, o) = -1762
-      | otherwise = 0
+bp2 :: (Marker, Marker) -> Int
+bp2 (MB, MO) = 60
+bp2 (MO, MO) = -1762
+bp2 _ = 0
 {-# INLINE bp2 #-}
 
-bq1 :: (Word8, Word8, Word8) -> Int
-bq1 t | t == (b, h, h) = 1150
-      | t == (b, h, m) = 1521
-      | t == (b, i, i) = -1158
-      | t == (b, i, m) = 886
-      | t == (b, m, h) = 1208
-      | t == (b, n, h) = 449
-      | t == (b, o, h) = -91
-      | t == (b, o, o) = -2597
-      | t == (o, h, i) = 451
-      | t == (o, i, h) = -296
-      | t == (o, k, a) = 1851
-      | t == (o, k, h) = -1020
-      | t == (o, k, k) = 904
-      | t == (o, o, o) = 2965
-      | otherwise = 0
+bq1 :: (Marker, CType, CType) -> Int
+bq1 (MB, CTH, CTH) = 1150
+bq1 (MB, CTH, CTM) = 1521
+bq1 (MB, CTI, CTI) = -1158
+bq1 (MB, CTI, CTM) = 886
+bq1 (MB, CTM, CTH) = 1208
+bq1 (MB, CTN, CTH) = 449
+bq1 (MB, CTO, CTH) = -91
+bq1 (MB, CTO, CTO) = -2597
+bq1 (MO, CTH, CTI) = 451
+bq1 (MO, CTI, CTH) = -296
+bq1 (MO, CTK, CTA) = 1851
+bq1 (MO, CTK, CTH) = -1020
+bq1 (MO, CTK, CTK) = 904
+bq1 (MO, CTO, CTO) = 2965
+bq1 _ = 0
 {-# INLINE bq1 #-}
 
-bq2 :: (Word8, Word8, Word8) -> Int
-bq2 t | t == (b, h, h) = 118
-      | t == (b, h, i) = -1159
-      | t == (b, h, m) = 466
-      | t == (b, i, h) = -919
-      | t == (b, k, k) = -1720
-      | t == (b, k, o) = 864
-      | t == (o, h, h) = -1139
-      | t == (o, h, m) = -181
-      | t == (o, i, h) = 153
-      | t == (u, h, i) = -1146
-      | otherwise = 0
+bq2 :: (Marker, CType, CType) -> Int
+bq2 (MB, CTH, CTH) = 118
+bq2 (MB, CTH, CTI) = -1159
+bq2 (MB, CTH, CTM) = 466
+bq2 (MB, CTI, CTH) = -919
+bq2 (MB, CTK, CTK) = -1720
+bq2 (MB, CTK, CTO) = 864
+bq2 (MO, CTH, CTH) = -1139
+bq2 (MO, CTH, CTM) = -181
+bq2 (MO, CTI, CTH) = 153
+bq2 (MU, CTH, CTI) = -1146
+bq2 _ = 0
 {-# INLINE bq2 #-}
 
-bq3 :: (Word8, Word8, Word8) -> Int
-bq3 t | t == (b, h, h) = -792
-      | t == (b, h, i) = 2664
-      | t == (b, i, i) = -299
-      | t == (b, k, i) = 419
-      | t == (b, m, h) = 937
-      | t == (b, m, m) = 8335
-      | t == (b, n, n) = 998
-      | t == (b, o, h) = 775
-      | t == (o, h, h) = 2174
-      | t == (o, h, m) = 439
-      | t == (o, i, i) = 280
-      | t == (o, k, h) = 1798
-      | t == (o, k, i) = -793
-      | t == (o, k, o) = -2242
-      | t == (o, m, h) = -2402
-      | t == (o, o, o) = 11699
-      | otherwise = 0
+bq3 :: (Marker, CType, CType) -> Int
+bq3 (MB, CTH, CTH) = -792
+bq3 (MB, CTH, CTI) = 2664
+bq3 (MB, CTI, CTI) = -299
+bq3 (MB, CTK, CTI) = 419
+bq3 (MB, CTM, CTH) = 937
+bq3 (MB, CTM, CTM) = 8335
+bq3 (MB, CTN, CTN) = 998
+bq3 (MB, CTO, CTH) = 775
+bq3 (MO, CTH, CTH) = 2174
+bq3 (MO, CTH, CTM) = 439
+bq3 (MO, CTI, CTI) = 280
+bq3 (MO, CTK, CTH) = 1798
+bq3 (MO, CTK, CTI) = -793
+bq3 (MO, CTK, CTO) = -2242
+bq3 (MO, CTM, CTH) = -2402
+bq3 (MO, CTO, CTO) = 11699
+bq3 _ = 0
 {-# INLINE bq3 #-}
 
-bq4 :: (Word8, Word8, Word8) -> Int
-bq4 t | t == (b, h, h) = -3895
-      | t == (b, i, i) = 3761
-      | t == (b, i, i) = -4654
-      | t == (b, i, i) = 1348
-      | t == (b, k, k) = -1806
-      | t == (b, m, m) = -3385
-      | t == (b, o, o) = -12396
-      | t == (o, a, a) = 926
-      | t == (o, h, h) = 266
-      | t == (o, h, h) = -2036
-      | t == (o, n, n) = -973
-      | otherwise = 0
+bq4 :: (Marker, CType, CType) -> Int
+bq4 (MB, CTH, CTH) = -3895
+bq4 (MB, CTI, CTH) = 3761
+bq4 (MB, CTI, CTI) = -4654
+bq4 (MB, CTI, CTK) = 1348
+bq4 (MB, CTK, CTK) = -1806
+bq4 (MB, CTM, CTM) = -3385
+bq4 (MB, CTO, CTO) = -12396
+bq4 (MO, CTA, CTA) = 926
+bq4 (MO, CTH, CTH) = 266
+bq4 (MO, CTH, CTK) = -2036
+bq4 (MO, CTN, CTN) = -973
+bq4 _ = 0
 {-# INLINE bq4 #-}
 
 bw1 :: (Int, Int) -> Int
@@ -508,153 +525,153 @@ bw3 t | t == (ord 'あ', ord 'た') = -2194
       | otherwise = 0
 {-# INLINE bw3 #-}
 
-tc1 :: (Word8, Word8, Word8) -> Int
-tc1 t | t == (a, a, a) = 1093
-      | t == (h, h, h) = 1029
-      | t == (h, h, m) = 580
-      | t == (h, i, i) = 998
-      | t == (h, o, h) = -390
-      | t == (h, o, m) = -331
-      | t == (i, h, i) = 1169
-      | t == (i, o, h) = -142
-      | t == (i, o, i) = -1015
-      | t == (i, o, m) = 467
-      | t == (m, m, h) = 187
-      | t == (o, o, i) = -1832
-      | otherwise = 0
+tc1 :: (CType, CType, CType) -> Int
+tc1 (CTA, CTA, CTA) = 1093
+tc1 (CTH, CTH, CTH) = 1029
+tc1 (CTH, CTH, CTM) = 580
+tc1 (CTH, CTI, CTI) = 998
+tc1 (CTH, CTO, CTH) = -390
+tc1 (CTH, CTO, CTM) = -331
+tc1 (CTI, CTH, CTI) = 1169
+tc1 (CTI, CTO, CTH) = -142
+tc1 (CTI, CTO, CTI) = -1015
+tc1 (CTI, CTO, CTM) = 467
+tc1 (CTM, CTM, CTH) = 187
+tc1 (CTO, CTO, CTI) = -1832
+tc1 _ = 0
 {-# INLINE tc1 #-}
 
-tc2 :: (Word8, Word8, Word8) -> Int
-tc2 t | t == (h, h, o) = 2088
-      | t == (h, i, i) = -1023
-      | t == (h, m, m) = -1154
-      | t == (i, h, i) = -1965
-      | t == (k, k, h) = 703
-      | t == (o, i, i) = -2649
-      | otherwise = 0
+tc2 :: (CType, CType, CType) -> Int
+tc2 (CTH, CTH, CTO) = 2088
+tc2 (CTH, CTI, CTI) = -1023
+tc2 (CTH, CTM, CTM) = -1154
+tc2 (CTI, CTH, CTI) = -1965
+tc2 (CTK, CTK, CTH) = 703
+tc2 (CTO, CTI, CTI) = -2649
+tc2 _ = 0
 {-# INLINE tc2 #-}
 
-tc3 :: (Word8, Word8, Word8) -> Int
-tc3 t | t == (a, a, a) = -294
-      | t == (h, h, h) = 346
-      | t == (h, h, i) = -341
-      | t == (h, i, i) = -1088
-      | t == (h, i, k) = 731
-      | t == (h, o, h) = -1486
-      | t == (i, h, h) = 128
-      | t == (i, h, i) = -3041
-      | t == (i, h, o) = -1935
-      | t == (i, i, h) = -825
-      | t == (i, i, m) = -1035
-      | t == (i, o, i) = -542
-      | t == (k, h, h) = -1216
-      | t == (k, k, a) = 491
-      | t == (k, k, h) = -1217
-      | t == (k, o, k) = -1009
-      | t == (m, h, h) = -2694
-      | t == (m, h, m) = -457
-      | t == (m, h, o) = 123
-      | t == (m, m, h) = -471
-      | t == (n, n, h) = -1689
-      | t == (n, n, o) = 662
-      | t == (o, h, o) = -3393
-      | otherwise = 0
+tc3 :: (CType, CType, CType) -> Int
+tc3 (CTA, CTA, CTA) = -294
+tc3 (CTH, CTH, CTH) = 346
+tc3 (CTH, CTH, CTI) = -341
+tc3 (CTH, CTI, CTI) = -1088
+tc3 (CTH, CTI, CTK) = 731
+tc3 (CTH, CTO, CTH) = -1486
+tc3 (CTI, CTH, CTH) = 128
+tc3 (CTI, CTH, CTI) = -3041
+tc3 (CTI, CTH, CTO) = -1935
+tc3 (CTI, CTI, CTH) = -825
+tc3 (CTI, CTI, CTM) = -1035
+tc3 (CTI, CTO, CTI) = -542
+tc3 (CTK, CTH, CTH) = -1216
+tc3 (CTK, CTK, CTA) = 491
+tc3 (CTK, CTK, CTH) = -1217
+tc3 (CTK, CTO, CTK) = -1009
+tc3 (CTM, CTH, CTH) = -2694
+tc3 (CTM, CTH, CTM) = -457
+tc3 (CTM, CTH, CTO) = 123
+tc3 (CTM, CTM, CTH) = -471
+tc3 (CTN, CTN, CTH) = -1689
+tc3 (CTN, CTN, CTO) = 662
+tc3 (CTO, CTH, CTO) = -3393
+tc3 _ = 0
 {-# INLINE tc3 #-}
 
-tc4 :: (Word8, Word8, Word8) -> Int
-tc4 t | t == (h, h, h) = -203
-      | t == (h, h, i) = 1344
-      | t == (h, h, k) = 365
-      | t == (h, h, m) = -122
-      | t == (h, h, n) = 182
-      | t == (h, h, o) = 669
-      | t == (h, i, h) = 804
-      | t == (h, i, i) = 679
-      | t == (h, o, h) = 446
-      | t == (i, h, h) = 695
-      | t == (i, h, o) = -2324
-      | t == (i, i, h) = 321
-      | t == (i, i, i) = 1497
-      | t == (i, i, o) = 656
-      | t == (i, o, o) = 54
-      | t == (k, a, k) = 4845
-      | t == (k, k, a) = 3386
-      | t == (k, k, k) = 3065
-      | t == (m, h, h) = -405
-      | t == (m, h, i) = 201
-      | t == (m, m, h) = -241
-      | t == (m, m, m) = 661
-      | t == (m, o, m) = 841
-      | otherwise = 0
+tc4 :: (CType, CType, CType) -> Int
+tc4 (CTH, CTH, CTH) = -203
+tc4 (CTH, CTH, CTI) = 1344
+tc4 (CTH, CTH, CTK) = 365
+tc4 (CTH, CTH, CTM) = -122
+tc4 (CTH, CTH, CTN) = 182
+tc4 (CTH, CTH, CTO) = 669
+tc4 (CTH, CTI, CTH) = 804
+tc4 (CTH, CTI, CTI) = 679
+tc4 (CTH, CTO, CTH) = 446
+tc4 (CTI, CTH, CTH) = 695
+tc4 (CTI, CTH, CTO) = -2324
+tc4 (CTI, CTI, CTH) = 321
+tc4 (CTI, CTI, CTI) = 1497
+tc4 (CTI, CTI, CTO) = 656
+tc4 (CTI, CTO, CTO) = 54
+tc4 (CTK, CTA, CTK) = 4845
+tc4 (CTK, CTK, CTA) = 3386
+tc4 (CTK, CTK, CTK) = 3065
+tc4 (CTM, CTH, CTH) = -405
+tc4 (CTM, CTH, CTI) = 201
+tc4 (CTM, CTM, CTH) = -241
+tc4 (CTM, CTM, CTM) = 661
+tc4 (CTM, CTO, CTM) = 841
+tc4 _ = 0
 {-# INLINE tc4 #-}
 
-tq1 :: (Word8, Word8, Word8, Word8) -> Int
-tq1 t | t == (b,h,h,h) = -227
-      | t == (b,h,h,i) = 316
-      | t == (b,h,i,h) = -132
-      | t == (b,i,h,h) = 60
-      | t == (b,i,i,i) = 1595
-      | t == (b,n,h,h) = -744
-      | t == (b,o,h,h) = 225
-      | t == (b,o,o,o) = -908
-      | t == (o,a,k,k) = 482
-      | t == (o,h,h,h) = 281
-      | t == (o,h,i,h) = 249
-      | t == (o,i,h,i) = 200
-      | t == (o,i,i,h) = -68
-      | otherwise = 0
+tq1 :: (Marker, CType, CType, CType) -> Int
+tq1 (MB, CTH, CTH, CTH) = -227
+tq1 (MB, CTH, CTH, CTI) = 316
+tq1 (MB, CTH, CTI, CTH) = -132
+tq1 (MB, CTI, CTH, CTH) = 60
+tq1 (MB, CTI, CTI, CTI) = 1595
+tq1 (MB, CTN, CTH, CTH) = -744
+tq1 (MB, CTO, CTH, CTH) = 225
+tq1 (MB, CTO, CTO, CTO) = -908
+tq1 (MO, CTA, CTK, CTK) = 482
+tq1 (MO, CTH, CTH, CTH) = 281
+tq1 (MO, CTH, CTI, CTH) = 249
+tq1 (MO, CTI, CTH, CTI) = 200
+tq1 (MO, CTI, CTI, CTH) = -68
+tq1 _ = 0
 {-# INLINE tq1 #-}
 
-tq2 :: (Word8, Word8, Word8, Word8) -> Int
-tq2 t | t == (b,i,h,h) = -1401
-      | t == (b,i,i,i) = -1033
-      | t == (b,k,a,k) = -543
-      | t == (b,o,o,o) = -5591
-      | otherwise = 0
+tq2 :: (Marker, CType, CType, CType) -> Int
+tq2 (MB, CTI, CTH, CTH) = -1401
+tq2 (MB, CTI, CTI, CTI) = -1033
+tq2 (MB, CTK, CTA, CTK) = -543
+tq2 (MB, CTO, CTO, CTO) = -5591
+tq2 _ = 0
 {-# INLINE tq2 #-}
 
-tq3 :: (Word8, Word8, Word8, Word8) -> Int
-tq3 t | t == (b,h,h,h) = 478
-      | t == (b,h,h,m) = -1073
-      | t == (b,h,i,h) = 222
-      | t == (b,h,i,i) = -504
-      | t == (b,i,i,h) = -116
-      | t == (b,i,i,i) = -105
-      | t == (b,m,h,i) = -863
-      | t == (b,m,h,m) = -464
-      | t == (b,o,m,h) = 620
-      | t == (o,h,h,h) = 346
-      | t == (o,h,h,i) = 1729
-      | t == (o,h,i,i) = 997
-      | t == (o,h,m,h) = 481
-      | t == (o,i,h,h) = 623
-      | t == (o,i,i,h) = 1344
-      | t == (o,k,a,k) = 2792
-      | t == (o,k,h,h) = 587
-      | t == (o,k,k,a) = 679
-      | t == (o,o,h,h) = 110
-      | t == (o,o,i,i) = -685
-      | otherwise = 0
+tq3 :: (Marker, CType, CType, CType) -> Int
+tq3 (MB, CTH, CTH, CTH) = 478
+tq3 (MB, CTH, CTH, CTM) = -1073
+tq3 (MB, CTH, CTI, CTH) = 222
+tq3 (MB, CTH, CTI, CTI) = -504
+tq3 (MB, CTI, CTI, CTH) = -116
+tq3 (MB, CTI, CTI, CTI) = -105
+tq3 (MB, CTM, CTH, CTI) = -863
+tq3 (MB, CTM, CTH, CTM) = -464
+tq3 (MB, CTO, CTM, CTH) = 620
+tq3 (MO, CTH, CTH, CTH) = 346
+tq3 (MO, CTH, CTH, CTI) = 1729
+tq3 (MO, CTH, CTI, CTI) = 997
+tq3 (MO, CTH, CTM, CTH) = 481
+tq3 (MO, CTI, CTH, CTH) = 623
+tq3 (MO, CTI, CTI, CTH) = 1344
+tq3 (MO, CTK, CTA, CTK) = 2792
+tq3 (MO, CTK, CTH, CTH) = 587
+tq3 (MO, CTK, CTK, CTA) = 679
+tq3 (MO, CTO, CTH, CTH) = 110
+tq3 (MO, CTO, CTI, CTI) = -685
+tq3 _ = 0
 {-# INLINE tq3 #-}
 
-tq4 :: (Word8, Word8, Word8, Word8) -> Int
-tq4 t | t == (b,h,h,h) = -721
-      | t == (b,h,h,m) = -3604
-      | t == (b,h,i,i) = -966
-      | t == (b,i,i,h) = -607
-      | t == (b,i,i,i) = -2181
-      | t == (o,a,a,a) = -2763
-      | t == (o,a,k,k) = 180
-      | t == (o,h,h,h) = -294
-      | t == (o,h,h,i) = 2446
-      | t == (o,h,h,o) = 480
-      | t == (o,h,i,h) = -1573
-      | t == (o,i,h,h) = 1935
-      | t == (o,i,h,i) = -493
-      | t == (o,i,i,h) = 626
-      | t == (o,i,i,i) = -4007
-      | t == (o,k,a,k) = -8156
-      | otherwise = 0
+tq4 :: (Marker, CType, CType, CType) -> Int
+tq4 (MB, CTH, CTH, CTH) = -721
+tq4 (MB, CTH, CTH, CTM) = -3604
+tq4 (MB, CTH, CTI, CTI) = -966
+tq4 (MB, CTI, CTI, CTH) = -607
+tq4 (MB, CTI, CTI, CTI) = -2181
+tq4 (MO, CTA, CTA, CTA) = -2763
+tq4 (MO, CTA, CTK, CTK) = 180
+tq4 (MO, CTH, CTH, CTH) = -294
+tq4 (MO, CTH, CTH, CTI) = 2446
+tq4 (MO, CTH, CTH, CTO) = 480
+tq4 (MO, CTH, CTI, CTH) = -1573
+tq4 (MO, CTI, CTH, CTH) = 1935
+tq4 (MO, CTI, CTH, CTI) = -493
+tq4 (MO, CTI, CTI, CTH) = 626
+tq4 (MO, CTI, CTI, CTI) = -4007
+tq4 (MO, CTK, CTA, CTK) = -8156
+tq4 _ = 0
 {-# INLINE tq4 #-}
 
 tw1 :: (Int, Int, Int) -> Int
@@ -714,106 +731,105 @@ tw4 t | t == (ord 'い', ord 'う', ord '.') = 8576
       | otherwise = 0
 {-# INLINE tw4 #-}
 
-uc1 :: Word8 -> Int
-uc1 t | t == toEnum (ord 'A') = 484
-      | t == toEnum (ord 'K') = 93
-      | t == toEnum (ord 'M') = 645
-      | t == toEnum (ord 'O') = -505
-      | otherwise = 0
+uc1 :: CType -> Int
+uc1 CTA = 484
+uc1 CTK = 93
+uc1 CTM = 645
+uc1 CTO = -505
+uc1 _ = 0
 {-# INLINE uc1 #-}
 
-uc2 :: Word8 -> Int
-uc2 t | t == toEnum (ord 'A') = 819
-      | t == toEnum (ord 'H') = 1059
-      | t == toEnum (ord 'I') = 409
-      | t == toEnum (ord 'M') = 3987
-      | t == toEnum (ord 'N') = 5775
-      | t == toEnum (ord 'O') = 646
-      | otherwise = 0
+uc2 :: CType -> Int
+uc2 CTA = 819
+uc2 CTH = 1059
+uc2 CTI = 409
+uc2 CTM = 3987
+uc2 CTN = 5775
+uc2 CTO = 646
+uc2 _ = 0
 {-# INLINE uc2 #-}
 
-uc3 :: Word8 -> Int
-uc3 t | t == toEnum (ord 'A') = -1370
-      | t == toEnum (ord 'I') = 2311
-      | otherwise = 0
+uc3 :: CType -> Int
+uc3 CTA = -1370
+uc3 CTI = 2311
+uc3 _ = 0
 {-# INLINE uc3 #-}
 
-uc4 :: Word8 -> Int
-uc4 t | t == toEnum (ord 'A') = -2643
-      | t == toEnum (ord 'H') = 1809
-      | t == toEnum (ord 'I') = -1032
-      | t == toEnum (ord 'K') = -3450
-      | t == toEnum (ord 'M') = 3565
-      | t == toEnum (ord 'N') = 3876
-      | t == toEnum (ord 'O') = 6646
-      | otherwise = 0
+uc4 :: CType -> Int
+uc4 CTA = -2643
+uc4 CTH = 1809
+uc4 CTI = -1032
+uc4 CTK = -3450
+uc4 CTM = 3565
+uc4 CTN = 3876
+uc4 CTO = 6646
 {-# INLINE uc4 #-}
 
-uc5 :: Word8 -> Int
-uc5 t | t == toEnum (ord 'H') = 313
-      | t == toEnum (ord 'I') = -1238
-      | t == toEnum (ord 'K') = -799
-      | t == toEnum (ord 'M') = 539
-      | t == toEnum (ord 'O') = -831
-      | otherwise = 0
+uc5 :: CType -> Int
+uc5 CTH = 313
+uc5 CTI = -1238
+uc5 CTK = -799
+uc5 CTM = 539
+uc5 CTO = -831
+uc5 _ = 0
 {-# INLINE uc5 #-}
 
-uc6 :: Word8 -> Int
-uc6 t | t == toEnum (ord 'H') = -506
-      | t == toEnum (ord 'I') = -253
-      | t == toEnum (ord 'K') = 87
-      | t == toEnum (ord 'M') = 247
-      | t == toEnum (ord 'O') = -387
-      | otherwise = 0
+uc6 :: CType -> Int
+uc6 CTH = -506
+uc6 CTI  = -253
+uc6 CTK  = 87
+uc6 CTM  = 247
+uc6 CTO  = -387
+uc6 _ = 0
 {-# INLINE uc6 #-}
 
-up1 :: Word8 -> Int
-up1 t | t == o = -214
-      | otherwise = 0
+up1 :: Marker -> Int
+up1 MO = -214
+up1 _ = 0
 {-# INLINE up1 #-}
 
-up2 :: Word8 -> Int
-up2 t | t == b = 69
-      | t == o = 935
-      | otherwise = 0
+up2 :: Marker -> Int
+up2 MB = 69
+up2 MO = 935
+up2 _ = 0
 {-# INLINE up2 #-}
 
-up3 :: Word8 -> Int
-up3 t | t == b = 189
-      | otherwise = 0
+up3 :: Marker -> Int
+up3 MB = 189
+up3 _ = 0
 {-# INLINE up3 #-}
 
-uq1 :: (Word8, Word8) -> Int
-uq1 t | t == (b,h) = 21
-      | t == (b,i) = -12
-      | t == (b,k) = -99
-      | t == (b,n) = 142
-      | t == (b,o) = -56
-      | t == (o,h) = -95
-      | t == (o,i) = 477
-      | t == (o,k) = 410
-      | t == (o,o) = -2422
-      | otherwise = 0
+uq1 :: (Marker, CType) -> Int
+uq1 (MB, CTH) = 21
+uq1 (MB, CTI) = -12
+uq1 (MB, CTK) = -99
+uq1 (MB, CTN) = 142
+uq1 (MB, CTO) = -56
+uq1 (MO, CTH) = -95
+uq1 (MO, CTI) = 477
+uq1 (MO, CTK) = 410
+uq1 (MO, CTO) = -2422
+uq1 _ = 0
 {-# INLINE uq1 #-}
 
-uq2 :: (Word8, Word8) -> Int
-uq2 t | t == (b,h) = 216
-      | t == (b,i) = 113
-      | t == (o,k) = 1759
-      | otherwise = 0
+uq2 :: (Marker, CType) -> Int
+uq2 (MB, CTH) = 216
+uq2 (MB, CTI) = 113
+uq2 (MO, CTK) = 1759
+uq2 _ = 0
 {-# INLINE uq2 #-}
 
-uq3 :: (Word8, Word8) -> Int
-uq3 t | t == (b,a) = -479
-      | t == (b,h) = 42
-      | t == (b,i) = 1913
-      | t == (b,k) = -7198
-      | t == (b,m) = 3160
-      | t == (b,n) = 6427
-      | t == (b,o) = 14761
-      | t == (o,i) = -827
-      | t == (o,n) = -3212
-      | otherwise = 0
+uq3 :: (Marker, CType) -> Int
+uq3 (MB, CTA) = -479
+uq3 (MB, CTH) = 42
+uq3 (MB, CTI) = 1913
+uq3 (MB, CTK) = -7198
+uq3 (MB, CTM) = 3160
+uq3 (MB, CTN) = 6427
+uq3 (MB, CTO) = 14761
+uq3 (MO, CTI) = -827
+uq3 (MO, CTN) = -3212
+uq3 _ = 0
 {-# INLINE uq3 #-}
 
 uw1 :: Int -> Int

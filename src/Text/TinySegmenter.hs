@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE StrictData #-}
@@ -23,8 +24,9 @@ import qualified Data.Text.Internal            as TI
 import qualified Data.Vector                   as V
 import qualified Data.Vector.Mutable           as MV
 import           Data.Word
-import           Text.TinySegmenter.Score
-import GHC.Exts
+
+#define INCLUDE_MODEL
+#include "TinySegmenter/Score.hs"
 
 takeThree :: T.Text -> (Int, Int, Int, T.Text)
 takeThree text = case T.uncons text of
@@ -80,21 +82,21 @@ data TokenizeState = TS { remain :: {-# UNPACK #-} !T.Text
                         , token :: !Word16List
                         , tokenLength :: {-# UNPACK #-} !Int
                         , score :: {-# UNPACK #-} !Int
-                        , p1 :: {-# UNPACK #-} !Word8
-                        , p2 :: {-# UNPACK #-} !Word8
-                        , p3 :: {-# UNPACK #-} !Word8
+                        , p1 :: {-# UNPACK #-} !Marker
+                        , p2 :: {-# UNPACK #-} !Marker
+                        , p3 :: {-# UNPACK #-} !Marker
                         , w1 :: {-# UNPACK #-} !Int
                         , w2 :: {-# UNPACK #-} !Int
                         , w3 :: {-# UNPACK #-} !Int
                         , w4 :: {-# UNPACK #-} !Int
                         , w5 :: {-# UNPACK #-} !Int
                         , w6 :: {-# UNPACK #-} !Int
-                        , c1 :: {-# UNPACK #-} !Word8
-                        , c2 :: {-# UNPACK #-} !Word8
-                        , c3 :: {-# UNPACK #-} !Word8
-                        , c4 :: {-# UNPACK #-} !Word8
-                        , c5 :: {-# UNPACK #-} !Word8
-                        , c6 :: {-# UNPACK #-} !Word8
+                        , c1 :: {-# UNPACK #-} !CType
+                        , c2 :: {-# UNPACK #-} !CType
+                        , c3 :: {-# UNPACK #-} !CType
+                        , c4 :: {-# UNPACK #-} !CType
+                        , c5 :: {-# UNPACK #-} !CType
+                        , c6 :: {-# UNPACK #-} !CType
                         }
 
 initialState :: T.Text -> TokenizeState
@@ -104,9 +106,9 @@ initialState text =
          , token       = WLNil
          , tokenLength = 0
          , score       = bias
-         , p1          = u
-         , p2          = u
-         , p3          = u
+         , p1          = MU
+         , p2          = MU
+         , p3          = MU
          , w1          = b1
          , w2          = b2
          , w3          = b3
@@ -232,10 +234,10 @@ evalScore = do
   if score > 0
     then do
       let word = tokenToText token tokenLength
-      put $ s { token = WLNil, tokenLength = 0, p1 = p2, p2 = p3, p3 = b }
+      put $ s { token = WLNil, tokenLength = 0, p1 = p2, p2 = p3, p3 = MB }
       return $ Just word
     else do
-      put $ s { p1 = p2, p2 = p3, p3 = o }
+      put $ s { p1 = p2, p2 = p3, p3 = MO }
       return Nothing
 {-# INLINE evalScore #-}
 
@@ -304,6 +306,6 @@ tokenizeToVec :: T.Text -> V.Vector T.Text
 tokenizeToVec text = v
   where
     v = runST $ do
-          (vec, len) <- oneShot (evalStateT tokenizeToVecM) $ initialState text
+          (vec, len) <- evalStateT tokenizeToVecM $ initialState text
           V.freeze $ MV.unsafeSlice 0 len vec
 {-# INLINE tokenizeToVec #-}
