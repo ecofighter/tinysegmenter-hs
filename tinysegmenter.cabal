@@ -16,21 +16,33 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:     Text.TinySegmenter.Text
+                       -- Text.TinySegmenter.Text.Lazy
                        Text.TinySegmenter.ByteString
                        Text.TinySegmenter.ByteString.Lazy
-  -- other-modules:       Text.TinySegmenter.Model
+  other-modules:
+                       -- Text.TinySegmenter.Model
   other-extensions:    RecordWildCards
                        BangPatterns
+                       MultiWayIf
                        CPP
   ghc-options:         -Wall
   build-depends:       base >=4.12 && <4.13
                      , transformers
                      , text == 1.2.*
                      , bytestring == 0.10.*
-                     , utf8-string
                      , vector
-                     , deepseq
   hs-source-dirs:      src
+  default-language:    Haskell2010
+
+test-suite test
+  hs-source-dirs:      test
+  main-is:             Test.hs
+  type:                exitcode-stdio-1.0
+  ghc-options:         -threaded
+  build-depends:       base >=4.12 && <4.13
+                     , text
+                     , bytestring
+                     , tinysegmenter
   default-language:    Haskell2010
 
 benchmark bench

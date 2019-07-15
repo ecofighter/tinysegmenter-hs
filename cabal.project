@@ -1,0 +1,9 @@
+packages: ./tinysegmenter.cabal
+flags: +llvm
+optimization: 2
+
+package *
+  ghc-options: -O2 -fllvm
+
+program-options
+  ghc-options: -O2 -threaded -fllvm

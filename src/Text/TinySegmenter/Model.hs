@@ -12,8 +12,8 @@ module Text.TinySegmenter.Model ( bias, b1, b2, b3, e1, e2, e3
                                 , tq1, tq2, tq3, tq4
                                 ) where
 
-import           Data.Char
 #endif
+import           Data.Char
 
 -- bias
 bias :: Int

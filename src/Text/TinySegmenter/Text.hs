@@ -12,7 +12,6 @@ import           Control.Monad.ST
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State.Strict
 import           Data.Bits
-import           Data.Char
 import           Data.Functor.Identity
 import qualified Data.List                     as L
 import qualified Data.Text                     as T
@@ -22,6 +21,7 @@ import qualified Data.Vector                   as V
 import qualified Data.Vector.Mutable           as MV
 import           Data.Word
 
+-- import           Text.TinySegmenter.Model
 #define INCLUDE_MODEL
 #include "Model.hs"
 
@@ -58,9 +58,8 @@ infixr 8 !:
 {-# INLINE (!:) #-}
 
 wlToList :: Word16List -> [Word16]
-wlToList WLNil = []
-wlToList (WLCons s sl) = let delayed = wlToList sl
-                         in s : delayed
+wlToList WLNil         = []
+wlToList (WLCons s sl) = let delayed = wlToList sl in s : delayed
 {-# INLINE wlToList #-}
 
 tokenToText :: Word16List -> Int -> T.Text
@@ -124,27 +123,26 @@ initialState text =
 moveNext :: Monad m => StateT TokenizeState m ()
 moveNext = do
   s@TS {..} <- get
-  when (w4 < e1) $ do
-    let (newW6, newRemain)
-          | T.length remain > 0 = (ord $ T.head remain, T.tail remain)
-          | w6 == e1            = (e2, T.empty)
-          | w6 == e2            = (e3, T.empty)
-          | otherwise           = (e1, T.empty)
-    put $ s { remain = newRemain
-            , score  = bias
-            , w1     = w2
-            , w2     = w3
-            , w3     = w4
-            , w4     = w5
-            , w5     = w6
-            , w6     = newW6
-            , c1     = c2
-            , c2     = c3
-            , c3     = c4
-            , c4     = c5
-            , c5     = c6
-            , c6     = getCTypes newW6
-            }
+  let (newW6, newRemain)
+        | T.length remain > 0 = (ord $ T.head remain, T.tail remain)
+        | w6 == e1            = (e2, T.empty)
+        | w6 >= e2            = (e3, T.empty)
+        | otherwise           = (e1, T.empty)
+  put $ s { remain = newRemain
+          , score  = bias
+          , w1     = w2
+          , w2     = w3
+          , w3     = w4
+          , w4     = w5
+          , w5     = w6
+          , w6     = newW6
+          , c1     = c2
+          , c2     = c3
+          , c3     = c4
+          , c4     = c5
+          , c5     = c6
+          , c6     = getCTypes newW6
+          }
 {-# INLINE moveNext #-}
 
 updateScore :: Monad m => StateT TokenizeState m ()
@@ -200,14 +198,13 @@ updateScore = do
 pushToToken :: Monad m => StateT TokenizeState m ()
 pushToToken = do
   s@TS {..} <- get
-  when (w3 < e1) $ do
-    let (newToken, newTokenLength)
-          | isPair w3
-          = let (upper, lower) = splitToWord16 w3
-            in  (lower !: upper !: token, tokenLength + 2)
-          | otherwise
-          = (toEnum w3 !: token, tokenLength + 1)
-    put $ s { token = newToken, tokenLength = newTokenLength }
+  let (newToken, newTokenLength)
+        | isPair w3
+        = let (upper, lower) = splitToWord16 w3
+          in  (lower !: upper !: token, tokenLength + 2)
+        | otherwise
+        = (toEnum w3 !: token, tokenLength + 1)
+  put $ s { token = newToken, tokenLength = newTokenLength }
 {-# INLINE pushToToken #-}
 
 isFinished :: Monad m => StateT TokenizeState m Bool
@@ -272,31 +269,30 @@ tokenizeToVecM = do
   len <- T.length <$> gets remain
   vec <- lift $ MV.unsafeNew len
   body (vec, 0)
-  where
-    body (!vec, !idx) = do
-      flag <- isFinished
-      if flag then do
+ where
+  body (!vec, !idx) = do
+    flag <- isFinished
+    if flag
+      then do
         word <- tailToResult
         case word of
           Just w -> do
             lift $ MV.unsafeWrite vec idx w
-            return (vec, idx+1)
-          Nothing ->
-            return (vec, idx)
+            return (vec, idx + 1)
+          Nothing -> return (vec, idx)
       else do
         word <- evalOneStep
         case word of
           Just w -> do
             lift $ MV.unsafeWrite vec idx w
-            body (vec, idx+1)
-          Nothing ->
-            body (vec, idx)
+            body (vec, idx + 1)
+          Nothing -> body (vec, idx)
 {-# INLINE tokenizeToVecM #-}
 
 tokenizeToVec :: T.Text -> V.Vector T.Text
 tokenizeToVec text = v
-  where
-    v = runST $ do
-          (vec, len) <- evalStateT tokenizeToVecM $ initialState text
-          V.freeze $ MV.unsafeSlice 0 len vec
+ where
+  v = runST $ do
+    (vec, len) <- evalStateT tokenizeToVecM $ initialState text
+    V.freeze $ MV.unsafeSlice 0 len vec
 {-# INLINE tokenizeToVec #-}
