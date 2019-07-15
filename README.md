@@ -1,4 +1,5 @@
 # tinysementer
+
 Haskell implementation of tinysegmenter, a compact Japanese tokenizer
 
 Machine lerning based compact Japanese tokenizer library.
