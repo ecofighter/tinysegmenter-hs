@@ -3,12 +3,9 @@ module Main where
 
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
-import qualified Data.Text.Lazy                as TL
-import qualified Data.Text.Lazy.IO             as TL
 import qualified Data.ByteString               as BS
 import qualified Data.ByteString.Lazy          as BSL
 import           Text.TinySegmenter.Text       as TT
-import           Text.TinySegmenter.Text.Lazy  as TTL
 import           Text.TinySegmenter.ByteString as TBS
 import           Text.TinySegmenter.ByteString.Lazy
                                                as TBSL
