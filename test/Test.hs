@@ -21,7 +21,6 @@ expect = ["私", "の", "名前", "は", "中野", "です"]
 main :: IO ()
 main = do
   assert (TT.tokenize before == expect) $ return ()
-  assert (TTL.tokenize before == expect) $ return ()
   assert (TBS.tokenize before == expect) $ return ()
   assert (TBSL.tokenize before == expect) $ return ()
   return ()
